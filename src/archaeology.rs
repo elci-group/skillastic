@@ -51,7 +51,7 @@ pub struct CommitChain {
 const MANIFESTS: &[&str] = &["package.json", "Cargo.toml", "requirements.txt"];
 
 /// Toolchain marker file → human name. Probed at each ref.
-const TOOLCHAIN_FILES: &[(&str, &str)] = &[
+pub(crate) const TOOLCHAIN_FILES: &[(&str, &str)] = &[
     ("webpack.config.js", "webpack"),
     ("webpack.config.ts", "webpack"),
     ("vite.config.js", "vite"),
