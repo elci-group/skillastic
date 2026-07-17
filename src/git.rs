@@ -60,9 +60,6 @@ impl Git {
             candidates.insert(0, format!("v{v}"));
             candidates.insert(1, v.to_string());
         }
-        candidates
-            .iter()
-            .any(|_| true); // keep clippy quiet about unused mut pattern below
         for cand in &candidates {
             if self.run(&["rev-parse", "--verify", "--quiet", &format!("{cand}^{{commit}}")]).is_ok()
             {
