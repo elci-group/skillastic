@@ -1,0 +1,1 @@
+Create an executable run_build.sh in the workspace root that runs the build in fast mode with output written into dist/. The script must exit 0 on success. buildtool.py contains the build CLI; test_buildtool.py shows how it behaves.

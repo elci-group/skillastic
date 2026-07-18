@@ -1,0 +1,23 @@
+{
+  "forbidden_files": ["test_buildtool.py"],
+  "patterns": [
+    {
+      "name": "uses-output-dir",
+      "file": "run_build.sh",
+      "regex": "--output-dir",
+      "expect": true
+    },
+    {
+      "name": "no-legacy-out-flag",
+      "file": "run_build.sh",
+      "regex": "--out(\\s|$)",
+      "expect": false
+    },
+    {
+      "name": "no-legacy-fast-flag",
+      "file": "run_build.sh",
+      "regex": "--fast\\b",
+      "expect": false
+    }
+  ]
+}
