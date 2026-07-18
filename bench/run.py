@@ -108,7 +108,7 @@ def prepare_workspace(fixture: Path, ws: Path, arm: str) -> None:
 
 
 def agent_argv(harness: str, model: str | None, prompt: str, workspace: Path,
-               log_out: Path) -> list[str]:
+               log_out: Path, targets: list[str] | None = None) -> list[str]:
     if harness == "kimi":
         return ["kimi", "-p", prompt, "--output-format", "stream-json", "-m", model]
     if harness == "codex":
@@ -123,6 +123,12 @@ def agent_argv(harness: str, model: str | None, prompt: str, workspace: Path,
         harness_py = Path(__file__).resolve().parent / "groq_harness.py"
         return [sys.executable, str(harness_py), model, str(workspace),
                 str(prompt_file), str(log_out)]
+    if harness == "compound":
+        prompt_file = log_out.with_suffix(".prompt.txt")
+        prompt_file.write_text(prompt)
+        harness_py = Path(__file__).resolve().parent / "compound_harness.py"
+        return [sys.executable, str(harness_py), model, str(workspace),
+                str(prompt_file), str(log_out)] + (targets or [])
     if harness == "echo":
         return ["true"]
     raise ValueError(f"unknown harness: {harness}")
