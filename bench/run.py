@@ -95,6 +95,12 @@ def agent_argv(harness: str, model: str | None, prompt: str, workspace: Path,
     if harness == "agy":
         return ["agy", "-p", prompt, "--dangerously-skip-permissions",
                 "--print-timeout", "10m", "--log-file", str(log_out)]
+    if harness == "groqraw":
+        prompt_file = log_out.with_suffix(".prompt.txt")
+        prompt_file.write_text(prompt)
+        harness_py = Path(__file__).resolve().parent / "groq_harness.py"
+        return [sys.executable, str(harness_py), model, str(workspace),
+                str(prompt_file), str(log_out)]
     if harness == "echo":
         return ["true"]
     raise ValueError(f"unknown harness: {harness}")
