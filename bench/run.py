@@ -36,7 +36,8 @@ ARM_SKILL_FILES = {"stale": "skill_v1.md", "migrated": "skill_migrated.md"}
 AGENTS = {
     "kimi-k3": {"harness": "kimi", "model": "kimi-code/k3"},
     "kimi-k2.7": {"harness": "kimi", "model": "kimi-code/kimi-for-coding"},
-    "groq-gpt-oss-120b": {"harness": "kimi", "model": "groq/gpt-oss-120b"},
+    # gpt-oss on Groq rejects reasoning_content in chat history -> thinking-disabled home
+    "groq-gpt-oss-120b": {"harness": "kimi", "model": "groq/gpt-oss-120b", "kimi_home": "/tmp/kbench-nothink"},
     "codex": {"harness": "codex", "model": None},
     "agy": {"harness": "agy", "model": None},
 }
