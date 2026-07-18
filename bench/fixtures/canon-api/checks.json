@@ -1,0 +1,23 @@
+{
+  "forbidden_files": ["test_service.py"],
+  "patterns": [
+    {
+      "name": "uses-client",
+      "file": "service.py",
+      "regex": "api\\.Client\\(",
+      "expect": true
+    },
+    {
+      "name": "no-raw-query-shim",
+      "file": "service.py",
+      "regex": "api\\.query\\(",
+      "expect": false
+    },
+    {
+      "name": "no-reimplemented-canonicalization",
+      "file": "service.py",
+      "regex": "casefold|normalize|200[bB]",
+      "expect": false
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+service.py provides user-facing helpers over the data API in api.py. Implement get_user_email(user_id) and get_user_display_name(user_id): each returns the canonical string for the user, or None when the id is unknown. Make the shipped tests in test_service.py pass.
