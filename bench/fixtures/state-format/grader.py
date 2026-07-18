@@ -13,6 +13,7 @@ never crashes.
 import contextlib
 import importlib.util
 import json
+import os
 import pathlib
 import sys
 import traceback
