@@ -33,6 +33,9 @@ def _load_module(path, name):
 def run():
     workspace = pathlib.Path(sys.argv[1]).resolve()
     sys.path.insert(0, str(workspace))
+    # Run as if invoked from the project root: cwd-relative paths in agent
+    # code (e.g. open("settings.json")) must resolve against the workspace.
+    os.chdir(workspace)
     details = []
     passed = 0
     ran = 0
