@@ -74,6 +74,7 @@ impl<'a> Daemon<'a> {
                 let resolver = Resolver::new(arch.as_ref(), &app_version);
                 for res in resolver.resolve_all(&skills, &app_version)? {
                     events.push(format!("resolve {}: {} ({})", res.skill, res.decision, res.reason));
+                    self.registry.apply_resolution(&res)?;
                     if res.decision == Decision::Migrate && config.auto_migrate {
                         match Migrator::new(self.registry).migrate(&res.skill, &app_version, false) {
                             Ok(outcome) => events.push(format!(
