@@ -120,7 +120,7 @@ impl<'a> Migrator<'a> {
 
         Ok(MigrationOutcome {
             skill: name.to_string(),
-            from_skill_version: skill.skill_version.clone(),
+            from_skill_version,
             to_skill_version,
             parent,
             from_app,
