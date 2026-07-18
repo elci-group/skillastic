@@ -4,9 +4,9 @@ import fmt
 import report
 
 # "café" decomposed: e + combining acute accent (display width 4, len() 5).
-CAFE_DECOMPOSED = "café"
+CAFE_DECOMPOSED = "cafe\u0301"
 # "café" composed: single code point U+00E9.
-CAFE_COMPOSED = "café"
+CAFE_COMPOSED = "caf\u00e9"
 
 
 class BannerTests(unittest.TestCase):
