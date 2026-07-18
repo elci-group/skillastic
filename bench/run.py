@@ -343,6 +343,8 @@ def run_one(agent_name: str, agent: dict, fixture: Path, task_name: str,
         task_text = (fixture / "task.txt").read_text()
         checks_data = json.loads((fixture / "checks.json").read_text())
         prompt = build_prompt(ws, task_text)
+        if harness == "compound":
+            prompt = build_compound_prompt(task_text)
 
         env = None
         if harness == "kimi":
@@ -350,7 +352,8 @@ def run_one(agent_name: str, agent: dict, fixture: Path, task_name: str,
             if not home.is_dir():
                 raise RuntimeError(f"KIMI_CODE_HOME {home} does not exist")
             env = dict(os.environ, KIMI_CODE_HOME=str(home))
-        argv = agent_argv(harness, agent["model"], prompt, ws, log_out)
+        argv = agent_argv(harness, agent["model"], prompt, ws, log_out,
+                          TASK_TARGETS.get(task_name, []))
         exit_code, timed_out = run_process(argv, ws, env, log_out, log_err, timeout)
         rec["exit_code"] = exit_code
         rec["timed_out"] = timed_out
