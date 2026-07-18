@@ -171,8 +171,11 @@ mod tests {
         let events = daemon.tick().unwrap();
         assert!(events.iter().any(|e| e.contains("resolve web: validate")));
         assert!(!events.iter().any(|e| e.contains("migrated")));
-        // Minor bump: resolver only asks for validation; skill is untouched.
-        assert_eq!(registry.load_skill("web").unwrap().verified_app_version, v("1.0.0"));
+        // Minor bump: resolver only asks for validation; version untouched,
+        // but the stored status reflects the decision.
+        let skill = registry.load_skill("web").unwrap();
+        assert_eq!(skill.verified_app_version, v("1.0.0"));
+        assert_eq!(skill.status, SkillStatus::NeedsValidation);
     }
 
     #[test]
