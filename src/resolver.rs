@@ -10,6 +10,7 @@
 //! | Dep change beyond what the bump explains, or downgrade| DeepAnalysis  |
 //! | No valid compatibility range on the skill             | Incompatible  |
 
+use crate::archaeology::Archaeology;
 use crate::error::{Result, SkillasticError};
 use crate::model::{Decision, Resolution, Skill, VersionDelta};
 use semver::{Version, VersionReq};
@@ -17,6 +18,42 @@ use semver::{Version, VersionReq};
 /// Knowledge of dependency movement between the two app versions.
 /// `None` = unknown (no git history available).
 pub type DepsChanged = Option<bool>;
+
+/// Resolves skills against an app version, computing the dependency-change
+/// signal per skill from git archaeology when history is available.
+pub struct Resolver<'a> {
+    arch: Option<&'a Archaeology>,
+    to_ref: Option<String>,
+}
+
+impl<'a> Resolver<'a> {
+    /// `arch` may be None (project not under git); the resolver then works
+    /// purely from semver, with the dependency signal unknown.
+    pub fn new(arch: Option<&'a Archaeology>, to_app: &Version) -> Self {
+        let to_ref = arch.and_then(|a| {
+            a.git()
+                .resolve_ref(&to_app.to_string())
+                .or_else(|| a.git().resolve_ref("HEAD"))
+        });
+        Self { arch, to_ref }
+    }
+
+    /// Did dependencies move between this skill's verified app version and
+    /// the target? None when there is no usable git history.
+    pub fn deps_changed_for(&self, from_app: &Version) -> DepsChanged {
+        let arch = self.arch?;
+        let from_ref = arch.git().resolve_ref(&from_app.to_string())?;
+        Some(arch.deps_changed(&from_ref, self.to_ref.as_deref()?))
+    }
+
+    pub fn resolve(&self, skill: &Skill, to_app: &Version) -> Result<Resolution> {
+        resolve(skill, to_app, self.deps_changed_for(&skill.verified_app_version))
+    }
+
+    pub fn resolve_all(&self, skills: &[Skill], to_app: &Version) -> Result<Vec<Resolution>> {
+        skills.iter().map(|s| self.resolve(s, to_app)).collect()
+    }
+}
 
 pub fn resolve(skill: &Skill, to_app: &Version, deps_changed: DepsChanged) -> Result<Resolution> {
     let from_app = skill.verified_app_version.clone();
