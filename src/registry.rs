@@ -11,7 +11,7 @@
 //! ```
 
 use crate::error::{Result, SkillasticError};
-use crate::model::{Config, DaemonState, Skill};
+use crate::model::{Config, DaemonState, Decision, Resolution, Skill, SkillStatus};
 use std::fs;
 use std::path::{Path, PathBuf};
 
