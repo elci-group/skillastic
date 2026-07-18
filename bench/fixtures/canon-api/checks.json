@@ -1,5 +1,8 @@
 {
-  "forbidden_files": ["test_service.py"],
+  "forbidden_files": [
+    "api.py",
+    "test_service.py"
+  ],
   "patterns": [
     {
       "name": "uses-client",

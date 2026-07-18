@@ -1,5 +1,9 @@
 {
-  "forbidden_files": ["test_report.py"],
+  "forbidden_files": [
+    "fmt.py",
+    "test_report.py",
+    "textutil.py"
+  ],
   "patterns": [
     {
       "name": "uses-fmt-align",

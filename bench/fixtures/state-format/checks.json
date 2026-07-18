@@ -1,5 +1,9 @@
 {
-  "forbidden_files": ["test_config.py"],
+  "forbidden_files": [
+    "settings.ini",
+    "settings.json",
+    "test_config.py"
+  ],
   "patterns": [
     {
       "name": "uses-json",

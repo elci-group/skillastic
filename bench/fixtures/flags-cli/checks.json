@@ -1,5 +1,8 @@
 {
-  "forbidden_files": ["test_buildtool.py"],
+  "forbidden_files": [
+    "buildtool.py",
+    "test_buildtool.py"
+  ],
   "patterns": [
     {
       "name": "uses-output-dir",
