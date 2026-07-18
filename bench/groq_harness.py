@@ -94,7 +94,8 @@ def main():
                            "tool_choice": "auto", "temperature": 0}).encode()
         req = urllib.request.Request(
             "https://api.groq.com/openai/v1/chat/completions", data=body,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"})
+            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                     "User-Agent": "skillastic-bench/1.0"})
         try:
             resp = json.load(urllib.request.urlopen(req, timeout=REQ_TIMEOUT))
         except urllib.error.HTTPError as e:
