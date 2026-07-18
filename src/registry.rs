@@ -115,6 +115,25 @@ impl Registry {
         )
     }
 
+    /// Reflect a resolver decision onto the stored skill's status.
+    /// `Load` leaves the status alone; unknown skills are skipped.
+    pub fn apply_resolution(&self, res: &Resolution) -> Result<()> {
+        let new_status = match res.decision {
+            Decision::Validate | Decision::DeepAnalysis => Some(SkillStatus::NeedsValidation),
+            Decision::Migrate => Some(SkillStatus::NeedsMigration),
+            Decision::Incompatible => Some(SkillStatus::Incompatible),
+            Decision::Load => None,
+        };
+        if let Some(status) = new_status
+            && let Ok(mut skill) = self.load_skill(&res.skill)
+            && skill.status != status
+        {
+            skill.status = status;
+            self.save_skill(&skill)?;
+        }
+        Ok(())
+    }
+
     pub fn load_skill(&self, name: &str) -> Result<Skill> {
         let path = self.skill_path(name);
         if !path.exists() {
