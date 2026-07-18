@@ -108,7 +108,7 @@ pub fn recent_events(registry: &Registry) -> Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Config, Skill};
+    use crate::model::{Config, Skill, SkillStatus};
     use semver::Version;
     use std::fs;
     use tempfile::TempDir;
