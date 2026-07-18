@@ -18,9 +18,18 @@ _ZERO_WIDTH_CHARS = ("​", "﻿")
 
 _ROWS = {
     "user": {
-        1: {"email": " A​lice@Example.COM ", "display_name": "  alice   JOHNSON "},
-        2: {"email": "BOB@example.com", "display_name": "bob​   smith"},
-        3: {"email": "﻿Carol@Example.com", "display_name": "CAROL  williams"},
+        1: {
+            "email": " A​lice@Example.COM ",
+            "display_name": "  alice   JOHNSON ",
+        },
+        2: {
+            "email": "BOB@example.com",
+            "display_name": "bob​   smith",
+        },
+        3: {
+            "email": "﻿Carol@Example.com",
+            "display_name": "CAROL  williams",
+        },
     }
 }
 
