@@ -1,0 +1,17 @@
+{
+  "forbidden_files": ["test_report.py"],
+  "patterns": [
+    {
+      "name": "uses-fmt-align",
+      "file": "report.py",
+      "regex": "fmt\\.align|from fmt import",
+      "expect": true
+    },
+    {
+      "name": "no-textutil",
+      "file": "report.py",
+      "regex": "textutil",
+      "expect": false
+    }
+  ]
+}

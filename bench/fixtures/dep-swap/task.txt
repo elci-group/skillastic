@@ -1,0 +1,1 @@
+report.py needs a banner(items) function that renders a header row: each item padded to width 10 with '-' and the columns joined by '|'. Make the shipped tests in test_report.py pass.
