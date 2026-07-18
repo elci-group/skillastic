@@ -33,6 +33,11 @@ TOOLS = [
     {"type": "function", "function": {
         "name": "finish", "description": "Declare the task complete.",
         "parameters": {"type": "object", "properties": {"summary": {"type": "string"}}, "required": ["summary"]}}},
+    # gpt-oss on Groq sometimes emits a 'commentary' call not in the schema;
+    # registering it as a no-op keeps the provider from rejecting the turn.
+    {"type": "function", "function": {
+        "name": "commentary", "description": "No-op channel for intermediate remarks.",
+        "parameters": {"type": "object", "properties": {"text": {"type": "string"}}}}},
 ]
 
 
