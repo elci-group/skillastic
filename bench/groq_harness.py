@@ -96,7 +96,8 @@ def main():
     ]
     for step in range(MAX_STEPS):
         body = json.dumps({"model": model, "messages": messages, "tools": TOOLS,
-                           "tool_choice": "auto", "temperature": 0}).encode()
+                           "tool_choice": "auto", "parallel_tool_calls": False,
+                           "temperature": 0}).encode()
         req = urllib.request.Request(
             "https://api.groq.com/openai/v1/chat/completions", data=body,
             headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
