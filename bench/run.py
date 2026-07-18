@@ -36,8 +36,9 @@ ARM_SKILL_FILES = {"stale": "skill_v1.md", "migrated": "skill_migrated.md"}
 AGENTS = {
     "kimi-k3": {"harness": "kimi", "model": "kimi-code/k3"},
     "kimi-k2.7": {"harness": "kimi", "model": "kimi-code/kimi-for-coding"},
-    # gpt-oss on Groq: reasoning suppressed via default_effort="none" in the bench home config
-    "groq-gpt-oss-120b": {"harness": "kimi", "model": "groq/gpt-oss-120b"},
+    # Groq models via the raw tool-loop harness (kimi/codex are provider-incompatible).
+    "groq-gpt-oss-120b": {"harness": "groqraw", "model": "openai/gpt-oss-120b"},
+    "groq-llama-70b": {"harness": "groqraw", "model": "llama-3.3-70b-versatile"},
     "codex": {"harness": "codex", "model": None},
     "agy": {"harness": "agy", "model": None},
 }

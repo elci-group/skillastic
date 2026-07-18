@@ -1,6 +1,6 @@
 [package]
 name = "skillastic"
-version = "0.16.2"
+version = "0.16.3"
 edition = "2024"
 description = "Adaptive skill runtime: version-aware skill lifecycle management for AI agents"
 license = "MIT"
