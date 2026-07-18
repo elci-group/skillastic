@@ -14,20 +14,20 @@ legacy callers and returns the stored dict untouched (uncanonicalized).
 
 import unicodedata
 
-_ZERO_WIDTH_CHARS = ("​", "﻿")
+_ZERO_WIDTH_CHARS = ("\u200b", "\ufeff")
 
 _ROWS = {
     "user": {
         1: {
-            "email": " A​lice@Example.COM ",
+            "email": " A\u200blice@Example.COM ",
             "display_name": "  alice   JOHNSON ",
         },
         2: {
             "email": "BOB@example.com",
-            "display_name": "bob​   smith",
+            "display_name": "bob\u200b   smith",
         },
         3: {
-            "email": "﻿Carol@Example.com",
+            "email": "\ufeffCarol@Example.com",
             "display_name": "CAROL  williams",
         },
     }
