@@ -39,6 +39,9 @@ AGENTS = {
     # Groq models via the raw tool-loop harness (kimi/codex are provider-incompatible).
     "groq-gpt-oss-120b": {"harness": "groqraw", "model": "openai/gpt-oss-120b"},
     "groq-llama-70b": {"harness": "groqraw", "model": "llama-3.3-70b-versatile"},
+    # Single-shot compound systems (built-in server-side tools, no client tools).
+    "groq-compound": {"harness": "compound", "model": "groq/compound"},
+    "groq-compound-mini": {"harness": "compound", "model": "groq/compound-mini"},
     "codex": {"harness": "codex", "model": None},
     "agy": {"harness": "agy", "model": None},
 }
