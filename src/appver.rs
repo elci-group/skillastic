@@ -23,12 +23,11 @@ pub fn detect(project_root: &Path, config: &Config, cli_override: Option<&str>) 
     if let Some(v) = from_package_json(project_root) {
         return Ok(v);
     }
-    if let Ok(git) = Git::open(project_root) {
-        if let Some(tag) = git.latest_tag("HEAD", false) {
-            if let Ok(v) = parse(&tag) {
-                return Ok(v);
-            }
-        }
+    if let Ok(git) = Git::open(project_root)
+        && let Some(tag) = git.latest_tag("HEAD", false)
+        && let Ok(v) = parse(&tag)
+    {
+        return Ok(v);
     }
     Err(SkillasticError::Other(
         "could not detect the application version; pass --app-version or set app_version in .skillastic/config.json".into(),
