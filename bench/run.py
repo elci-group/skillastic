@@ -220,6 +220,33 @@ def parse_codex_log(path: Path) -> tuple[int, dict, int, int | None, int | None]
     return total, by_type, errors, tokens_in, tokens_out
 
 
+def parse_groqraw_log(path: Path) -> tuple[int, dict, int, int | None, int | None]:
+    """Parse groq_harness JSONL -> (total, by_tool, errors, tokens_in, tokens_out)."""
+    total, by_tool, errors = 0, {}, 0
+    tokens_in = tokens_out = 0
+    for line in path.read_text(errors="replace").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            obj = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        t = obj.get("type")
+        if t == "tool_call":
+            total += 1
+            name = obj.get("name") or "unknown"
+            by_tool[name] = by_tool.get(name, 0) + 1
+        elif t == "tool_error":
+            errors += 1
+        elif t == "error":
+            errors += 1
+        elif t == "usage":
+            tokens_in += obj.get("prompt_tokens") or 0
+            tokens_out += obj.get("completion_tokens") or 0
+    return total, by_tool, errors, tokens_in, tokens_out
+
+
 def agy_trace(since: float) -> tuple[int | None, dict, str | None]:
     """Sum step counts from agy conversation DBs modified at/after `since`.
     Returns (tool_calls_total, by_step_type, note)."""
