@@ -48,12 +48,11 @@ fn from_cargo_toml(root: &Path) -> Option<Version> {
             in_package = line == "[package]";
             continue;
         }
-        if in_package {
-            if let Some((key, value)) = line.split_once('=') {
-                if key.trim() == "version" {
-                    return Version::parse(value.trim().trim_matches('"')).ok();
-                }
-            }
+        if in_package
+            && let Some((key, value)) = line.split_once('=')
+            && key.trim() == "version"
+        {
+            return Version::parse(value.trim().trim_matches('"')).ok();
         }
     }
     None
