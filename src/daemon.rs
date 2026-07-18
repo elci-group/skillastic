@@ -210,7 +210,9 @@ mod tests {
         let events = daemon.tick().unwrap();
         assert!(events.iter().any(|e| e.contains("resolve web: migrate")));
         assert!(!events.iter().any(|e| e.contains("migrated")));
-        assert_eq!(registry.load_skill("web").unwrap().verified_app_version, v("1.0.0"));
+        let skill = registry.load_skill("web").unwrap();
+        assert_eq!(skill.verified_app_version, v("1.0.0"));
+        assert_eq!(skill.status, SkillStatus::NeedsMigration);
     }
 
     #[test]
