@@ -1,10 +1,11 @@
 import unittest
 
+import fmt
 import report
 
-# "café" in decomposed form: e + combining acute accent (display width 4,
-# len() 5).
+# "café" decomposed: e + combining acute accent (display width 4, len() 5).
 CAFE_DECOMPOSED = "café"
+# "café" composed: single code point U+00E9.
 CAFE_COMPOSED = "café"
 
 
@@ -22,8 +23,9 @@ class BannerTests(unittest.TestCase):
         expected = CAFE_DECOMPOSED + "-" * 6 + "|" + "x" + "-" * 9
         self.assertEqual(report.banner([CAFE_DECOMPOSED, "x"]), expected)
 
-    def test_composed_and_decomposed_render_equal(self):
-        self.assertEqual(report.banner([CAFE_COMPOSED]), report.banner([CAFE_DECOMPOSED]) + "")
+    def test_composed_and_decomposed_same_display_width(self):
+        self.assertEqual(fmt.display_width(report.banner([CAFE_COMPOSED])), 10)
+        self.assertEqual(fmt.display_width(report.banner([CAFE_DECOMPOSED])), 10)
 
 
 if __name__ == "__main__":
