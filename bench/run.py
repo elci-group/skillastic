@@ -61,6 +61,25 @@ def build_prompt(workspace: Path, task_text: str) -> str:
     )
 
 
+def build_compound_prompt(task_text: str) -> str:
+    """Prompt body for single-shot harnesses (no filesystem access; the
+    harness inlines the workspace files after this text)."""
+    return (
+        "You are completing a coding task. All project files are included below.\n\n"
+        "The file SKILL.md documents this project's conventions; follow it.\n\n"
+        f"TASK:\n{task_text}\n"
+    )
+
+
+# Files each task expects the agent to produce (used by single-shot harnesses).
+TASK_TARGETS = {
+    "canon-api": ["service.py"],
+    "dep-swap": ["report.py"],
+    "flags-cli": ["run_build.sh"],
+    "state-format": ["config.py"],
+}
+
+
 def snapshot(workspace: Path) -> dict[str, str]:
     """sha256 of every file under workspace, keyed by relative path."""
     snap = {}
