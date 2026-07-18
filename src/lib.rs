@@ -5,6 +5,7 @@
 //! registry, version resolver, commit archaeology, context capture,
 //! and skill migration.
 
+pub mod appver;
 pub mod archaeology;
 pub mod capture;
 pub mod daemon;
