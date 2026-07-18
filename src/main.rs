@@ -6,7 +6,7 @@ use skillastic::capture::Capture;
 use skillastic::daemon::{recent_events, Daemon};
 use skillastic::error::Result;
 use skillastic::migrate::{verify, Migrator};
-use skillastic::model::{Config, Decision, Skill, SkillStatus};
+use skillastic::model::{Config, Decision, Skill};
 use skillastic::registry::Registry;
 use skillastic::resolver::{parse_req, Resolver};
 use skillastic::SkillasticError;
