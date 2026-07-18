@@ -1,0 +1,17 @@
+{
+  "forbidden_files": ["test_config.py"],
+  "patterns": [
+    {
+      "name": "uses-json",
+      "file": "config.py",
+      "regex": "import json|json\\.loads",
+      "expect": true
+    },
+    {
+      "name": "no-configparser",
+      "file": "config.py",
+      "regex": "configparser",
+      "expect": false
+    }
+  ]
+}

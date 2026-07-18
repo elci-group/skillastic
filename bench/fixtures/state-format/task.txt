@@ -1,0 +1,1 @@
+config.py must provide load_settings() returning the app's settings as a flat dict with keys host (str), port (int) and debug (bool). Make the shipped tests in test_config.py pass.
