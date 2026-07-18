@@ -284,9 +284,10 @@ def run_one(agent_name: str, agent: dict, fixture: Path, task_name: str,
 
         env = None
         if harness == "kimi":
-            if not KIMI_HOME.is_dir():
-                raise RuntimeError(f"KIMI_CODE_HOME {KIMI_HOME} does not exist")
-            env = dict(os.environ, KIMI_CODE_HOME=str(KIMI_HOME))
+            home = Path(agent.get("kimi_home") or KIMI_HOME)
+            if not home.is_dir():
+                raise RuntimeError(f"KIMI_CODE_HOME {home} does not exist")
+            env = dict(os.environ, KIMI_CODE_HOME=str(home))
         argv = agent_argv(harness, agent["model"], prompt, ws, log_out)
         exit_code, timed_out = run_process(argv, ws, env, log_out, log_err, timeout)
         rec["exit_code"] = exit_code
