@@ -352,6 +352,10 @@ def run_one(agent_name: str, agent: dict, fixture: Path, task_name: str,
             rec["tool_errors"] = 0 if t is not None else None
             if note and rec["error"] is None:
                 rec["error"] = note
+        elif harness == "groqraw":
+            t, calls, errs, tin, tout = parse_groqraw_log(log_out)
+            rec["tool_calls_total"], rec["tool_calls"], rec["tool_errors"] = t, calls, errs
+            rec["tokens_in"], rec["tokens_out"] = tin, tout
         # echo harness: no log parsing, tool fields stay null/empty.
     except Exception as e:  # never let one run kill the batch
         rec["error"] = f"{type(e).__name__}: {e}"
