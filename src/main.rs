@@ -3,7 +3,7 @@ use serde::Serialize;
 use skillastic::appver;
 use skillastic::archaeology::Archaeology;
 use skillastic::capture::Capture;
-use skillastic::daemon::Daemon;
+use skillastic::daemon::{recent_events, Daemon};
 use skillastic::error::Result;
 use skillastic::migrate::{verify, Migrator};
 use skillastic::model::{Config, Decision, Skill, SkillStatus};
@@ -115,6 +115,9 @@ enum Command {
         #[arg(long, default_value_t = 60)]
         interval: u64,
     },
+
+    /// Show recent daemon events recorded in the workspace state.
+    Events,
 }
 
 fn main() -> ExitCode {
@@ -242,20 +245,7 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
 
             // Reflect decisions onto stored skill statuses.
             for res in &resolutions {
-                let new_status = match res.decision {
-                    Decision::Validate | Decision::DeepAnalysis => Some(SkillStatus::NeedsValidation),
-                    Decision::Migrate => Some(SkillStatus::NeedsMigration),
-                    Decision::Incompatible => Some(SkillStatus::Incompatible),
-                    Decision::Load => None,
-                };
-                if let Some(status) = new_status {
-                    if let Ok(mut skill) = registry.load_skill(&res.skill) {
-                        if skill.status != status {
-                            skill.status = status;
-                            registry.save_skill(&skill)?;
-                        }
-                    }
-                }
+                registry.apply_resolution(res)?;
             }
 
             if json {
@@ -466,6 +456,20 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
         Command::Daemon { interval } => {
             let registry = open_registry(project_root)?;
             Daemon::new(&registry, interval).run()?;
+        }
+
+        Command::Events => {
+            let registry = open_registry(project_root)?;
+            let events = recent_events(&registry)?;
+            if json {
+                print_json(&events);
+            } else if events.is_empty() {
+                println!("No daemon events recorded yet.");
+            } else {
+                for event in &events {
+                    println!("{event}");
+                }
+            }
         }
     }
     Ok(())
