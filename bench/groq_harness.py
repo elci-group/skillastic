@@ -98,14 +98,28 @@ def main():
         body = json.dumps({"model": model, "messages": messages, "tools": TOOLS,
                            "tool_choice": "auto", "parallel_tool_calls": False,
                            "temperature": 0}).encode()
-        req = urllib.request.Request(
-            "https://api.groq.com/openai/v1/chat/completions", data=body,
-            headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
-                     "User-Agent": "skillastic-bench/1.0"})
-        try:
-            resp = json.load(urllib.request.urlopen(req, timeout=REQ_TIMEOUT))
-        except urllib.error.HTTPError as e:
-            log.write(json.dumps({"type": "error", "status": e.code, "body": e.read().decode()[:500]}) + "\n")
+
+        def call():
+            req = urllib.request.Request(
+                "https://api.groq.com/openai/v1/chat/completions", data=body,
+                headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
+                         "User-Agent": "skillastic-bench/1.0"})
+            return json.load(urllib.request.urlopen(req, timeout=REQ_TIMEOUT))
+
+        resp = None
+        for attempt in range(3):  # CLI harnesses retry malformed generations; match that
+            try:
+                resp = call()
+                break
+            except urllib.error.HTTPError as e:
+                err_body = e.read().decode()[:500]
+                log.write(json.dumps({"type": "error", "status": e.code, "body": err_body}) + "\n")
+                malformed = e.code == 400 and (
+                    "tool_use_failed" in err_body or "failed_generation" in err_body
+                    or "Failed to call a function" in err_body)
+                if not malformed or attempt == 2:
+                    return 1
+        if resp is None:
             return 1
         usage = resp.get("usage") or {}
         log.write(json.dumps({"type": "usage", "prompt_tokens": usage.get("prompt_tokens"),
