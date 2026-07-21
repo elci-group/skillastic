@@ -140,6 +140,13 @@ impl Git {
         self.run(&["cat-file", "-e", &format!("{ref_}:{path}")]).is_ok()
     }
 
+    /// Object type ("blob"/"tree") of a path at a ref, if it exists.
+    pub fn object_type(&self, ref_: &str, path: &str) -> Option<String> {
+        self.run(&["cat-file", "-t", &format!("{ref_}:{path}")])
+            .ok()
+            .map(|s| s.trim().to_string())
+    }
+
     /// Top-level entries (files and dirs) of the tree at a ref.
     /// Directory names carry a trailing `/`.
     pub fn ls_tree(&self, ref_: &str) -> Result<Vec<String>> {
