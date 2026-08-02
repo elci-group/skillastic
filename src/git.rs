@@ -38,7 +38,9 @@ pub struct Git {
 impl Git {
     /// Open a repo; errors if `root` is not inside a git work tree.
     pub fn open(root: &Path) -> Result<Self> {
-        let git = Self { root: root.to_path_buf() };
+        let git = Self {
+            root: root.to_path_buf(),
+        };
         git.run(&["rev-parse", "--is-inside-work-tree"])?;
         Ok(git)
     }
@@ -49,7 +51,10 @@ impl Git {
 
     /// Short SHA of HEAD.
     pub fn head(&self) -> Result<String> {
-        Ok(self.run(&["rev-parse", "--short", "HEAD"])?.trim().to_string())
+        Ok(self
+            .run(&["rev-parse", "--short", "HEAD"])?
+            .trim()
+            .to_string())
     }
 
     /// Resolve a version/ref name to a commit-ish.
@@ -61,7 +66,14 @@ impl Git {
             candidates.insert(1, v.to_string());
         }
         for cand in &candidates {
-            if self.run(&["rev-parse", "--verify", "--quiet", &format!("{cand}^{{commit}}")]).is_ok()
+            if self
+                .run(&[
+                    "rev-parse",
+                    "--verify",
+                    "--quiet",
+                    &format!("{cand}^{{commit}}"),
+                ])
+                .is_ok()
             {
                 return Some(cand.clone());
             }
@@ -72,7 +84,11 @@ impl Git {
     /// Most recent tag reachable from `to` (excluding `to` itself when
     /// `exclude_self` — used to find the *previous* release tag).
     pub fn latest_tag(&self, to: &str, exclude_self: bool) -> Option<String> {
-        let target = if exclude_self { format!("{to}^") } else { to.to_string() };
+        let target = if exclude_self {
+            format!("{to}^")
+        } else {
+            to.to_string()
+        };
         self.run(&["describe", "--tags", "--abbrev=0", &target])
             .ok()
             .map(|s| s.trim().to_string())
@@ -82,7 +98,12 @@ impl Git {
     /// Commits in `from..to`, oldest first.
     pub fn log(&self, from: &str, to: &str) -> Result<Vec<Commit>> {
         let format = format!("%H{FIELD_SEP}%s{FIELD_SEP}%b{RECORD_SEP}");
-        let out = self.run(&["log", "--reverse", &format!("--format={format}"), &format!("{from}..{to}")])?;
+        let out = self.run(&[
+            "log",
+            "--reverse",
+            &format!("--format={format}"),
+            &format!("{from}..{to}"),
+        ])?;
         let mut commits = Vec::new();
         for record in out.split(RECORD_SEP) {
             let record = record.trim_matches('\n');
@@ -137,7 +158,8 @@ impl Git {
     }
 
     pub fn file_exists(&self, ref_: &str, path: &str) -> bool {
-        self.run(&["cat-file", "-e", &format!("{ref_}:{path}")]).is_ok()
+        self.run(&["cat-file", "-e", &format!("{ref_}:{path}")])
+            .is_ok()
     }
 
     /// Object type ("blob"/"tree") of a path at a ref, if it exists.

@@ -47,7 +47,11 @@ impl<'a> Resolver<'a> {
     }
 
     pub fn resolve(&self, skill: &Skill, to_app: &Version) -> Result<Resolution> {
-        resolve(skill, to_app, self.deps_changed_for(&skill.verified_app_version))
+        resolve(
+            skill,
+            to_app,
+            self.deps_changed_for(&skill.verified_app_version),
+        )
     }
 
     pub fn resolve_all(&self, skills: &[Skill], to_app: &Version) -> Result<Vec<Resolution>> {
@@ -83,14 +87,14 @@ pub fn resolve(skill: &Skill, to_app: &Version, deps_changed: DepsChanged) -> Re
     } else if !in_range && saw_valid_req {
         (
             Decision::Migrate,
-            format!("app {to_app} is outside compatible range {:?}", skill.compatible_apps),
+            format!(
+                "app {to_app} is outside compatible range {:?}",
+                skill.compatible_apps
+            ),
         )
     } else {
         match delta {
-            VersionDelta::Same => (
-                Decision::Load,
-                format!("skill verified for app {to_app}"),
-            ),
+            VersionDelta::Same => (Decision::Load, format!("skill verified for app {to_app}")),
             VersionDelta::Patch => match deps_changed {
                 Some(true) => (
                     Decision::DeepAnalysis,
@@ -134,7 +138,10 @@ pub fn resolve_all(
     to_app: &Version,
     deps_changed: DepsChanged,
 ) -> Result<Vec<Resolution>> {
-    skills.iter().map(|s| resolve(s, to_app, deps_changed)).collect()
+    skills
+        .iter()
+        .map(|s| resolve(s, to_app, deps_changed))
+        .collect()
 }
 
 /// Parse a semver requirement. Accepts the spec's space-separated form

@@ -1,15 +1,15 @@
 use clap::{Parser, Subcommand};
 use serde::Serialize;
+use skillastic::SkillasticError;
 use skillastic::appver;
 use skillastic::archaeology::Archaeology;
 use skillastic::capture::Capture;
-use skillastic::daemon::{recent_events, Daemon};
+use skillastic::daemon::{Daemon, recent_events};
 use skillastic::error::Result;
-use skillastic::migrate::{verify, Migrator};
+use skillastic::migrate::{Migrator, verify};
 use skillastic::model::{Config, Decision, Skill};
 use skillastic::registry::Registry;
-use skillastic::resolver::{parse_req, Resolver};
-use skillastic::SkillasticError;
+use skillastic::resolver::{Resolver, parse_req};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -160,18 +160,32 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                     "app_name": name,
                 }));
             } else {
-                println!("Initialized skillastic workspace for '{name}' in {}", registry.root().display());
+                println!(
+                    "Initialized skillastic workspace for '{name}' in {}",
+                    registry.root().display()
+                );
             }
         }
 
-        Command::Add { name, version, compatible, body, verify: verify_now } => {
+        Command::Add {
+            name,
+            version,
+            compatible,
+            body,
+            verify: verify_now,
+        } => {
             let registry = open_registry(project_root)?;
             let config = registry.config()?;
             let app_version = appver::detect(project_root, &config, app_version_override)?;
             for range in &compatible {
                 parse_req(range)?; // fail fast on garbage ranges
             }
-            let mut skill = Skill::new(&name, appver::parse(&version)?, compatible, app_version.clone());
+            let mut skill = Skill::new(
+                &name,
+                appver::parse(&version)?,
+                compatible,
+                app_version.clone(),
+            );
             skill.context = Capture::scan(project_root)?;
             let body = match body {
                 Some(path) => std::fs::read_to_string(path)?,
@@ -215,7 +229,14 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 print!(
                     "{}",
                     table(
-                        &["SKILL", "VERSION", "STATUS", "CONF", "COMPATIBLE APPS", "VERIFIED APP"],
+                        &[
+                            "SKILL",
+                            "VERSION",
+                            "STATUS",
+                            "CONF",
+                            "COMPATIBLE APPS",
+                            "VERIFIED APP"
+                        ],
                         rows,
                     )
                 );
@@ -270,7 +291,10 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                             ]
                         })
                         .collect();
-                    print!("{}", table(&["SKILL", "FROM", "TO", "DECISION", "REASON"], rows));
+                    print!(
+                        "{}",
+                        table(&["SKILL", "FROM", "TO", "DECISION", "REASON"], rows)
+                    );
                 }
             }
         }
@@ -345,20 +369,21 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             let app_version = appver::detect(project_root, &config, app_version_override)?;
             let migrator = Migrator::new(&registry);
 
-            let targets: Vec<String> = if all {
-                let arch = Archaeology::new(project_root).ok();
-                let resolver = Resolver::new(arch.as_ref(), &app_version);
-                resolver
-                    .resolve_all(&registry.list_skills()?, &app_version)?
-                    .into_iter()
-                    .filter(|r| r.decision == Decision::Migrate)
-                    .map(|r| r.skill)
-                    .collect()
-            } else {
-                vec![name.ok_or_else(|| {
-                    SkillasticError::Other("pass a skill name or --all".into())
-                })?]
-            };
+            let targets: Vec<String> =
+                if all {
+                    let arch = Archaeology::new(project_root).ok();
+                    let resolver = Resolver::new(arch.as_ref(), &app_version);
+                    resolver
+                        .resolve_all(&registry.list_skills()?, &app_version)?
+                        .into_iter()
+                        .filter(|r| r.decision == Decision::Migrate)
+                        .map(|r| r.skill)
+                        .collect()
+                } else {
+                    vec![name.ok_or_else(|| {
+                        SkillasticError::Other("pass a skill name or --all".into())
+                    })?]
+                };
 
             if targets.is_empty() {
                 println!("Nothing to migrate.");
@@ -430,7 +455,11 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 let mut current_id = skill.id();
                 let mut cursor = Some(skill.clone());
                 while let Some(node) = cursor {
-                    let marker = if node.id() == current_id { " (current)" } else { "" };
+                    let marker = if node.id() == current_id {
+                        " (current)"
+                    } else {
+                        ""
+                    };
                     println!("  {}{}", node.id(), marker);
                     if !node.mutation_history.is_empty() {
                         for m in &node.mutation_history {

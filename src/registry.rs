@@ -63,7 +63,10 @@ impl Registry {
 
     /// Path to the project that contains this workspace.
     pub fn project_root(&self) -> PathBuf {
-        self.root.parent().map(Path::to_path_buf).unwrap_or_default()
+        self.root
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_default()
     }
 
     // ---- config & state -------------------------------------------------
@@ -90,7 +93,10 @@ impl Registry {
     }
 
     pub fn save_state(&self, state: &DaemonState) -> Result<()> {
-        write_atomic(&self.root.join(STATE), &serde_json::to_string_pretty(state)?)
+        write_atomic(
+            &self.root.join(STATE),
+            &serde_json::to_string_pretty(state)?,
+        )
     }
 
     // ---- skills ----------------------------------------------------------
@@ -124,12 +130,13 @@ impl Registry {
             Decision::Incompatible => Some(SkillStatus::Incompatible),
             Decision::Load => None,
         };
-        if let Some(status) = new_status
-            && let Ok(mut skill) = self.load_skill(&res.skill)
-            && skill.status != status
-        {
-            skill.status = status;
-            self.save_skill(&skill)?;
+        if let Some(status) = new_status {
+            if let Ok(mut skill) = self.load_skill(&res.skill) {
+                if skill.status != status {
+                    skill.status = status;
+                    self.save_skill(&skill)?;
+                }
+            }
         }
         Ok(())
     }
@@ -285,14 +292,24 @@ mod tests {
     #[test]
     fn add_load_list_roundtrip() {
         let (_dir, registry) = setup();
-        let skill = Skill::new("frontend-react", v("2.4.1"), vec![">=2.0.0".into()], v("2.4.1"));
-        registry.add_skill(&skill, "# Frontend\nUse Redux.").unwrap();
+        let skill = Skill::new(
+            "frontend-react",
+            v("2.4.1"),
+            vec![">=2.0.0".into()],
+            v("2.4.1"),
+        );
+        registry
+            .add_skill(&skill, "# Frontend\nUse Redux.")
+            .unwrap();
 
         assert!(registry.add_skill(&skill, "dup").is_err());
 
         let loaded = registry.load_skill("frontend-react").unwrap();
         assert_eq!(loaded.skill_version, v("2.4.1"));
-        assert_eq!(registry.skill_body(&loaded).unwrap(), "# Frontend\nUse Redux.");
+        assert_eq!(
+            registry.skill_body(&loaded).unwrap(),
+            "# Frontend\nUse Redux."
+        );
 
         let all = registry.list_skills().unwrap();
         assert_eq!(all.len(), 1);
@@ -321,6 +338,9 @@ mod tests {
         let (frozen, body) = registry.load_snapshot("database@1.7.3").unwrap();
         assert_eq!(frozen.skill_version, v("1.7.3"));
         assert_eq!(body, "Use PostgreSQL.");
-        assert_eq!(registry.snapshots_for("database").unwrap(), vec!["database@1.7.3"]);
+        assert_eq!(
+            registry.snapshots_for("database").unwrap(),
+            vec!["database@1.7.3"]
+        );
     }
 }

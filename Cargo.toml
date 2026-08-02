@@ -2,8 +2,24 @@
 name = "skillastic"
 version = "0.21.9"
 edition = "2024"
+rust-version = "1.85"
 description = "Adaptive skill runtime: version-aware skill lifecycle management for AI agents"
+authors = ["Skillastic contributors"]
 license = "MIT"
+readme = "README.md"
+repository = "https://github.com/elci-group/skillastic"
+homepage = "https://github.com/elci-group/skillastic"
+documentation = "https://docs.rs/skillastic"
+keywords = ["ai-agents", "cli", "semver", "skills", "migration"]
+categories = ["command-line-utilities", "development-tools"]
+exclude = [
+  ".skillastic/**",
+  ".kaptaind/**",
+  ".kaptainignore",
+  "bench/**",
+  "kaptaind.toml",
+  "ROADMAP.md",
+]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }

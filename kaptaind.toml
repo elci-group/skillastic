@@ -31,12 +31,22 @@ min_commit_interval = 10
 command = "cargo test"
 required = true
 
-# [staging]
-# mode = "cluster"    # "cluster" (default, only observed changes), "pattern",
-#                     # or "all" (git add -A; warns at startup, aborts on
-#                     # secret-pattern files — avoid in shared checkouts)
-# include = ["src/**"] # only used in "pattern" mode
-# exclude = ["*.log", ".env*"]
+[staging]
+mode = "pattern"
+include = [
+  ".github/**",
+  "src/**",
+  "tests/**",
+  "bench/**",
+  "*.md",
+  "*.toml",
+  "Cargo.lock",
+  "VERSION",
+  "LICENSE",
+  ".gitignore",
+  ".kaptainignore",
+]
+exclude = ["target/**", "**/__pycache__/**", "*.pyc", ".env*"]
 
 # [deckhand]
 # enabled = false              # enable automatic storage management

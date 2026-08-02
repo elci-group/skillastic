@@ -73,15 +73,21 @@ impl<'a> Daemon<'a> {
                 let arch = Archaeology::new(&project_root).ok();
                 let resolver = Resolver::new(arch.as_ref(), &app_version);
                 for res in resolver.resolve_all(&skills, &app_version)? {
-                    events.push(format!("resolve {}: {} ({})", res.skill, res.decision, res.reason));
+                    events.push(format!(
+                        "resolve {}: {} ({})",
+                        res.skill, res.decision, res.reason
+                    ));
                     self.registry.apply_resolution(&res)?;
                     if res.decision == Decision::Migrate && config.auto_migrate {
-                        match Migrator::new(self.registry).migrate(&res.skill, &app_version, false) {
+                        match Migrator::new(self.registry).migrate(&res.skill, &app_version, false)
+                        {
                             Ok(outcome) => events.push(format!(
                                 "migrated {}: skill {} -> {}",
                                 outcome.skill, outcome.from_skill_version, outcome.to_skill_version
                             )),
-                            Err(e) => events.push(format!("migration failed for {}: {e}", res.skill)),
+                            Err(e) => {
+                                events.push(format!("migration failed for {}: {e}", res.skill))
+                            }
                         }
                     }
                 }
@@ -93,7 +99,10 @@ impl<'a> Daemon<'a> {
 
         state.last_check = Some(Utc::now());
         for event in &events {
-            state.log(format!("[{}] {event}", Utc::now().format("%Y-%m-%d %H:%M:%S")));
+            state.log(format!(
+                "[{}] {event}",
+                Utc::now().format("%Y-%m-%d %H:%M:%S")
+            ));
         }
         self.registry.save_state(&state)?;
         Ok(events)
@@ -188,7 +197,11 @@ mod tests {
         set_app_version(&dir, "2.0.0");
         let events = daemon.tick().unwrap();
         assert!(events.iter().any(|e| e.contains("resolve web: migrate")));
-        assert!(events.iter().any(|e| e.starts_with("migrated web: skill 1.0.0 -> 2.0.0")));
+        assert!(
+            events
+                .iter()
+                .any(|e| e.starts_with("migrated web: skill 1.0.0 -> 2.0.0"))
+        );
 
         let skill = registry.load_skill("web").unwrap();
         assert_eq!(skill.skill_version, v("2.0.0"));

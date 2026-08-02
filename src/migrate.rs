@@ -63,7 +63,11 @@ impl<'a> Migrator<'a> {
 
         // 1. Snapshot the existing skill (spec: capture instructions,
         //    examples, failure modes, tool assumptions, prior mutations).
-        let snapshot_dir = if dry_run { None } else { Some(self.registry.snapshot(&skill)?) };
+        let snapshot_dir = if dry_run {
+            None
+        } else {
+            Some(self.registry.snapshot(&skill)?)
+        };
 
         // 2. Commit-chain analysis (best effort; capture-only fallback when
         //    the project isn't a git repo or refs don't resolve).
@@ -79,8 +83,13 @@ impl<'a> Migrator<'a> {
             None => skill.context.clone(),
         };
 
-        let delta =
-            ContextDelta::build(chain.as_ref(), from_app.clone(), to_app.clone(), &old_fp, &new_fp);
+        let delta = ContextDelta::build(
+            chain.as_ref(),
+            from_app.clone(),
+            to_app.clone(),
+            &old_fp,
+            &new_fp,
+        );
 
         // 4. Patch: deterministic append-only notes, or the optional LLM
         //    adapter when `llm_command` is configured.

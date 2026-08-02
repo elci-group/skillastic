@@ -107,10 +107,21 @@ impl ContextDelta {
             parts.push(format!("+{} toolchain", self.toolchain_appeared.join("+")));
         }
         if !self.toolchain_disappeared.is_empty() {
-            parts.push(format!("-{} toolchain", self.toolchain_disappeared.join("-")));
+            parts.push(format!(
+                "-{} toolchain",
+                self.toolchain_disappeared.join("-")
+            ));
         }
-        let from = self.from_app.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "?".into());
-        let to = self.to_app.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "?".into());
+        let from = self
+            .from_app
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "?".into());
+        let to = self
+            .to_app
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "?".into());
         if parts.is_empty() {
             format!("migrate app {from} -> {to}: no structural changes detected")
         } else {
@@ -121,8 +132,16 @@ impl ContextDelta {
     /// Render the deterministic, append-only skill patch. The existing body
     /// is never rewritten — notes are reviewable diffs, not silent edits.
     pub fn to_markdown(&self) -> String {
-        let to = self.to_app.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "?".into());
-        let from = self.from_app.as_ref().map(|v| v.to_string()).unwrap_or_else(|| "?".into());
+        let to = self
+            .to_app
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "?".into());
+        let from = self
+            .from_app
+            .as_ref()
+            .map(|v| v.to_string())
+            .unwrap_or_else(|| "?".into());
         let mut out = format!(
             "\n\n---\n\n## Migration Notes (app v{to})\n\n\
              _Migrated from app v{from} on {}. Run `skillastic verify` after reviewing \
@@ -142,13 +161,19 @@ impl ContextDelta {
         {
             out.push_str("\n### Deprecated assumptions\n");
             for name in self.removed_deps.keys() {
-                out.push_str(&format!("- Dependency `{name}` was removed — do not recommend it.\n"));
+                out.push_str(&format!(
+                    "- Dependency `{name}` was removed — do not recommend it.\n"
+                ));
             }
             for fw in &self.frameworks_disappeared {
-                out.push_str(&format!("- Framework `{fw}` is no longer present — do not recommend it.\n"));
+                out.push_str(&format!(
+                    "- Framework `{fw}` is no longer present — do not recommend it.\n"
+                ));
             }
             for tc in &self.toolchain_disappeared {
-                out.push_str(&format!("- Toolchain `{tc}` was removed — drop instructions that assume it.\n"));
+                out.push_str(&format!(
+                    "- Toolchain `{tc}` was removed — drop instructions that assume it.\n"
+                ));
             }
             for d in &self.dirs_disappeared {
                 out.push_str(&format!("- Directory `{d}/` no longer exists.\n"));
@@ -162,11 +187,17 @@ impl ContextDelta {
         {
             out.push_str("\n### New capabilities\n");
             for (name, ver) in &self.added_deps {
-                let ver = if ver.is_empty() { String::new() } else { format!(" ({ver})") };
+                let ver = if ver.is_empty() {
+                    String::new()
+                } else {
+                    format!(" ({ver})")
+                };
                 out.push_str(&format!("- Dependency `{name}`{ver} was added.\n"));
             }
             for fw in &self.frameworks_appeared {
-                out.push_str(&format!("- Framework `{fw}` is now present — prefer it where applicable.\n"));
+                out.push_str(&format!(
+                    "- Framework `{fw}` is now present — prefer it where applicable.\n"
+                ));
             }
             for tc in &self.toolchain_appeared {
                 out.push_str(&format!("- Toolchain `{tc}` is now in use.\n"));
@@ -219,8 +250,12 @@ mod tests {
             }],
             file_changes: vec![],
             dep_changes: DepChanges {
-                added: [("next".to_string(), "14.0.0".to_string())].into_iter().collect(),
-                removed: [("redux".to_string(), "5.0.0".to_string())].into_iter().collect(),
+                added: [("next".to_string(), "14.0.0".to_string())]
+                    .into_iter()
+                    .collect(),
+                removed: [("redux".to_string(), "5.0.0".to_string())]
+                    .into_iter()
+                    .collect(),
                 changed: [("react".to_string(), ("18.0.0".into(), "19.0.0".into()))]
                     .into_iter()
                     .collect(),
@@ -240,7 +275,11 @@ mod tests {
             ..Default::default()
         };
         let new_fp = ContextFingerprint {
-            frameworks: vec!["next.js".into(), "next.js app-router".into(), "react".into()],
+            frameworks: vec![
+                "next.js".into(),
+                "next.js app-router".into(),
+                "react".into(),
+            ],
             directories: vec!["app".into()],
             ..Default::default()
         };
@@ -268,6 +307,10 @@ mod tests {
         let fp = ContextFingerprint::default();
         let delta = ContextDelta::build(None, v("1.0.0"), v("1.1.0"), &fp, &fp);
         assert!(delta.is_empty());
-        assert!(delta.to_markdown().contains("No structural changes detected"));
+        assert!(
+            delta
+                .to_markdown()
+                .contains("No structural changes detected")
+        );
     }
 }

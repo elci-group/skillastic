@@ -272,11 +272,26 @@ mod tests {
 
     #[test]
     fn version_delta_levels() {
-        assert_eq!(VersionDelta::between(&v("2.4.1"), &v("2.4.1")), VersionDelta::Same);
-        assert_eq!(VersionDelta::between(&v("2.4.1"), &v("2.4.2")), VersionDelta::Patch);
-        assert_eq!(VersionDelta::between(&v("2.4.1"), &v("2.5.0")), VersionDelta::Minor);
-        assert_eq!(VersionDelta::between(&v("2.4.1"), &v("3.0.0")), VersionDelta::Major);
-        assert_eq!(VersionDelta::between(&v("3.0.0"), &v("2.4.1")), VersionDelta::Downgrade);
+        assert_eq!(
+            VersionDelta::between(&v("2.4.1"), &v("2.4.1")),
+            VersionDelta::Same
+        );
+        assert_eq!(
+            VersionDelta::between(&v("2.4.1"), &v("2.4.2")),
+            VersionDelta::Patch
+        );
+        assert_eq!(
+            VersionDelta::between(&v("2.4.1"), &v("2.5.0")),
+            VersionDelta::Minor
+        );
+        assert_eq!(
+            VersionDelta::between(&v("2.4.1"), &v("3.0.0")),
+            VersionDelta::Major
+        );
+        assert_eq!(
+            VersionDelta::between(&v("3.0.0"), &v("2.4.1")),
+            VersionDelta::Downgrade
+        );
     }
 
     #[test]

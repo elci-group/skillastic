@@ -1,6 +1,10 @@
 # Common
 .git
 .kaptaind
+target
+__pycache__
+*.pyc
+bench/results
 .DS_Store
 *.swp
 *.swo

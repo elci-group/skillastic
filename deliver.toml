@@ -1,0 +1,79 @@
+[[file]]
+path = "README.md"
+required = true
+min_size_bytes = 1000
+require_regex = ["Quick start", "Development", "MIT License"]
+
+[[file]]
+path = "LICENSE"
+required = true
+require_regex = ["MIT License", "Permission is hereby granted"]
+
+[[file]]
+path = "SECURITY.md"
+required = true
+require_regex = ["Reporting a vulnerability"]
+
+[[file]]
+path = ".github/workflows/ci.yml"
+required = true
+require_regex = ["cargo fmt", "cargo clippy", "cargo test", "cargo package"]
+
+[[file]]
+path = "tests/cli.rs"
+required = true
+require_regex = ["json_lifecycle_round_trip", "actionable_error"]
+
+[[command]]
+name = "format"
+cmd = ["cargo", "fmt", "--all", "--", "--check"]
+expect_exit = 0
+timeout_secs = 60
+
+[[command]]
+name = "clippy"
+cmd = ["cargo", "clippy", "--locked", "--all-targets", "--all-features", "--", "-D", "warnings"]
+expect_exit = 0
+timeout_secs = 180
+
+[[command]]
+name = "tests"
+cmd = ["cargo", "test", "--locked", "--all-targets", "--all-features"]
+expect_exit = 0
+timeout_secs = 180
+
+[[command]]
+name = "rustdoc"
+cmd = ["cargo", "doc", "--locked", "--no-deps", "--all-features"]
+env = { RUSTDOCFLAGS = "-D warnings" }
+expect_exit = 0
+timeout_secs = 180
+
+[[command]]
+name = "release build"
+cmd = ["cargo", "build", "--release", "--locked"]
+expect_exit = 0
+timeout_secs = 180
+
+[[command]]
+name = "benchmark fixtures"
+cmd = ["python3", "bench/verify_fixtures.py"]
+expect_exit = 0
+timeout_secs = 180
+stdout_contains = ["all fixtures: 18/18"]
+
+[[command]]
+name = "package"
+cmd = ["cargo", "package", "--allow-dirty", "--locked", "--offline"]
+expect_exit = 0
+timeout_secs = 180
+
+[[command]]
+name = "RustSec audit"
+cmd = ["cargo", "audit", "--no-fetch"]
+expect_exit = 0
+timeout_secs = 180
+
+[git]
+no_uncommitted_changes = false
+no_untracked_files = false

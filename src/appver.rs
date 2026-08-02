@@ -23,11 +23,12 @@ pub fn detect(project_root: &Path, config: &Config, cli_override: Option<&str>) 
     if let Some(v) = from_package_json(project_root) {
         return Ok(v);
     }
-    if let Ok(git) = Git::open(project_root)
-        && let Some(tag) = git.latest_tag("HEAD", false)
-        && let Ok(v) = parse(&tag)
-    {
-        return Ok(v);
+    if let Ok(git) = Git::open(project_root) {
+        if let Some(tag) = git.latest_tag("HEAD", false) {
+            if let Ok(v) = parse(&tag) {
+                return Ok(v);
+            }
+        }
     }
     Err(SkillasticError::Other(
         "could not detect the application version; pass --app-version or set app_version in .skillastic/config.json".into(),
@@ -48,11 +49,12 @@ fn from_cargo_toml(root: &Path) -> Option<Version> {
             in_package = line == "[package]";
             continue;
         }
-        if in_package
-            && let Some((key, value)) = line.split_once('=')
-            && key.trim() == "version"
-        {
-            return Version::parse(value.trim().trim_matches('"')).ok();
+        if in_package {
+            if let Some((key, value)) = line.split_once('=') {
+                if key.trim() == "version" {
+                    return Version::parse(value.trim().trim_matches('"')).ok();
+                }
+            }
         }
     }
     None
@@ -77,13 +79,29 @@ mod tests {
         // Nothing yet.
         assert!(detect(dir.path(), &config, None).is_err());
         // CLI override wins even over manifests.
-        fs::write(dir.path().join("Cargo.toml"), "[package]\nversion = \"1.2.3\"\n").unwrap();
-        assert_eq!(detect(dir.path(), &config, Some("9.9.9")).unwrap(), Version::new(9, 9, 9));
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nversion = \"1.2.3\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            detect(dir.path(), &config, Some("9.9.9")).unwrap(),
+            Version::new(9, 9, 9)
+        );
         // Manifest detection.
-        assert_eq!(detect(dir.path(), &config, None).unwrap(), Version::new(1, 2, 3));
+        assert_eq!(
+            detect(dir.path(), &config, None).unwrap(),
+            Version::new(1, 2, 3)
+        );
         // Config pin beats the manifest.
-        let pinned = Config { app_version: Some(Version::new(2, 0, 0)), ..Default::default() };
-        assert_eq!(detect(dir.path(), &pinned, None).unwrap(), Version::new(2, 0, 0));
+        let pinned = Config {
+            app_version: Some(Version::new(2, 0, 0)),
+            ..Default::default()
+        };
+        assert_eq!(
+            detect(dir.path(), &pinned, None).unwrap(),
+            Version::new(2, 0, 0)
+        );
     }
 
     #[test]

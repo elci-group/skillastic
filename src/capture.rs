@@ -2,7 +2,7 @@
 //! frameworks, toolchains, directory shape, dependencies — either from the
 //! working tree or reconstructed at a git ref.
 
-use crate::archaeology::{parse_manifest, TOOLCHAIN_FILES};
+use crate::archaeology::{TOOLCHAIN_FILES, parse_manifest};
 use crate::error::Result;
 use crate::git::Git;
 use crate::model::ContextFingerprint;
@@ -15,8 +15,17 @@ const MANIFESTS: &[&str] = &["package.json", "Cargo.toml", "requirements.txt"];
 
 /// Directories that carry no architectural signal.
 const NOISE_DIRS: &[&str] = &[
-    "target", "node_modules", ".git", ".skillastic", "dist", "build", "out", ".next",
-    "coverage", "__pycache__", ".venv",
+    "target",
+    "node_modules",
+    ".git",
+    ".skillastic",
+    "dist",
+    "build",
+    "out",
+    ".next",
+    "coverage",
+    "__pycache__",
+    ".venv",
 ];
 
 /// Dependency name → framework. Architecturally meaningful only —

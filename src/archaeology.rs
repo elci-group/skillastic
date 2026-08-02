@@ -82,7 +82,9 @@ pub struct Archaeology {
 
 impl Archaeology {
     pub fn new(project_root: &Path) -> Result<Self> {
-        Ok(Self { git: Git::open(project_root)? })
+        Ok(Self {
+            git: Git::open(project_root)?,
+        })
     }
 
     pub fn git(&self) -> &Git {
@@ -156,8 +158,16 @@ impl Archaeology {
         let before = at(from_ref);
         let after = at(to_ref);
         ToolchainChanges {
-            appeared: after.iter().filter(|t| !before.contains(t)).map(|s| s.to_string()).collect(),
-            disappeared: before.iter().filter(|t| !after.contains(t)).map(|s| s.to_string()).collect(),
+            appeared: after
+                .iter()
+                .filter(|t| !before.contains(t))
+                .map(|s| s.to_string())
+                .collect(),
+            disappeared: before
+                .iter()
+                .filter(|t| !after.contains(t))
+                .map(|s| s.to_string())
+                .collect(),
         }
     }
 }
@@ -213,27 +223,30 @@ fn parse_cargo_toml(contents: &str) -> BTreeMap<String, String> {
         if !in_deps || line.starts_with('#') {
             continue;
         }
-        let Some((name, value)) = line.split_once('=') else { continue };
+        let Some((name, value)) = line.split_once('=') else {
+            continue;
+        };
         let name = name.trim().trim_matches('"');
         if name.is_empty() {
             continue;
         }
         let value = value.trim();
-        let version = if let Some(quoted) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
-            quoted.to_string()
-        } else if value.starts_with('{') {
-            // Inline table: find `version = "..."`.
-            value
-                .trim_start_matches('{')
-                .trim_end_matches('}')
-                .split(',')
-                .filter_map(|kv| kv.split_once('='))
-                .find(|(k, _)| k.trim() == "version")
-                .map(|(_, v)| v.trim().trim_matches(|c| c == '"' || c == '}').to_string())
-                .unwrap_or_default()
-        } else {
-            continue;
-        };
+        let version =
+            if let Some(quoted) = value.strip_prefix('"').and_then(|v| v.strip_suffix('"')) {
+                quoted.to_string()
+            } else if value.starts_with('{') {
+                // Inline table: find `version = "..."`.
+                value
+                    .trim_start_matches('{')
+                    .trim_end_matches('}')
+                    .split(',')
+                    .filter_map(|kv| kv.split_once('='))
+                    .find(|(k, _)| k.trim() == "version")
+                    .map(|(_, v)| v.trim().trim_matches(|c| c == '"' || c == '}').to_string())
+                    .unwrap_or_default()
+            } else {
+                continue;
+            };
         deps.insert(name.to_string(), version);
     }
     deps
@@ -255,10 +268,7 @@ fn parse_requirements(contents: &str) -> BTreeMap<String, String> {
     deps
 }
 
-fn diff_deps(
-    old: &BTreeMap<String, String>,
-    new: &BTreeMap<String, String>,
-) -> DepChanges {
+fn diff_deps(old: &BTreeMap<String, String>, new: &BTreeMap<String, String>) -> DepChanges {
     let mut changes = DepChanges::default();
     for (name, ver) in new {
         match old.get(name) {
@@ -266,7 +276,9 @@ fn diff_deps(
                 changes.added.insert(name.clone(), ver.clone());
             }
             Some(old_ver) if old_ver != ver => {
-                changes.changed.insert(name.clone(), (old_ver.clone(), ver.clone()));
+                changes
+                    .changed
+                    .insert(name.clone(), (old_ver.clone(), ver.clone()));
             }
             _ => {}
         }
@@ -340,14 +352,21 @@ tempfile = "3"
 
     #[test]
     fn dep_diff() {
-        let old: BTreeMap<_, _> =
-            [("redux", "5.0"), ("react", "18.0")].iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
-        let new: BTreeMap<_, _> =
-            [("react", "19.0"), ("zustand", "4.5")].iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+        let old: BTreeMap<_, _> = [("redux", "5.0"), ("react", "18.0")]
+            .iter()
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .collect();
+        let new: BTreeMap<_, _> = [("react", "19.0"), ("zustand", "4.5")]
+            .iter()
+            .map(|(a, b)| (a.to_string(), b.to_string()))
+            .collect();
         let diff = diff_deps(&old, &new);
         assert!(diff.added.contains_key("zustand"));
         assert!(diff.removed.contains_key("redux"));
-        assert_eq!(diff.changed.get("react").unwrap(), &("18.0".into(), "19.0".into()));
+        assert_eq!(
+            diff.changed.get("react").unwrap(),
+            &("18.0".into(), "19.0".into())
+        );
         assert!(diff.any());
     }
 }
