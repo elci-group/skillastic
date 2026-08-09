@@ -173,7 +173,7 @@ fn walk(
         .filter_map(|entry| entry.ok())
         .any(|entry| entry.path().join(".git").is_dir());
     if (git_root && !is_scan_root && !(markers.is_empty() && has_nested_git))
-        || (!inside_project && has_manifest)
+        || (!is_scan_root && !inside_project && has_manifest)
     {
         found.insert(dir.to_path_buf());
     }
@@ -310,6 +310,9 @@ fn infer_recommendations(root: &Path, projects: &[ProjectAudit], model: &str) ->
         .iter()
         .filter(|p| p.workspace.state != WorkspaceState::Ready)
     {
+        if bundle.len() > 120_000 {
+            break;
+        }
         bundle.push_str(&format!(
             "PROJECT {} STATE {:?} MARKERS {:?}\n",
             project.path, project.workspace.state, project.markers
@@ -321,9 +324,9 @@ fn infer_recommendations(root: &Path, projects: &[ProjectAudit], model: &str) ->
                 "--meta",
                 "--tree",
                 "--depth-limit",
-                "2",
+                "1",
                 "--token-limit",
-                "1200",
+                "600",
             ])
             .current_dir(&path)
             .output();
@@ -404,6 +407,13 @@ mod tests {
         fs::write(
             dir.path().join("Cargo.toml"),
             "[package]\nname=\"root\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
+        let missing = dir.path().join("missing");
+        fs::create_dir_all(&missing).unwrap();
+        fs::write(
+            missing.join("Cargo.toml"),
+            "[package]\nname=\"missing\"\nversion=\"0.1.0\"\n",
         )
         .unwrap();
         let ready = dir.path().join("ready");

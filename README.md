@@ -34,6 +34,18 @@ skillastic status
 skillastic capture --json
 ```
 
+Audit every project under a workspace source (including the conventional
+`projects`, `vico-projects`, `work`, and `src` sources):
+
+```sh
+skillastic audit --root /home/sal --json
+skillastic audit --root /home/sal --source /path/to/other/projects --infer --json
+```
+
+The audit's missing/incomplete/empty/ready classifications are deterministic.
+`--infer` optionally bundles bounded project context with `bound` and asks
+Groq (using `GROQ_API_KEY`) only to prioritize the deterministic findings.
+
 When the application moves outside a skill's compatibility range, preview the deterministic migration before writing it:
 
 ```sh
