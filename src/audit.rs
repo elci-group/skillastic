@@ -144,15 +144,15 @@ pub fn run(
 
 fn discover_projects(root: &Path) -> Result<Vec<PathBuf>> {
     let mut found = BTreeSet::new();
-    walk(root, root, 0, false, &mut found)?;
+    walk(root, 0, false, true, &mut found)?;
     Ok(found.into_iter().collect())
 }
 
 fn walk(
-    root: &Path,
     dir: &Path,
     depth: usize,
     inside_project: bool,
+    is_scan_root: bool,
     found: &mut BTreeSet<PathBuf>,
 ) -> Result<()> {
     if depth > 3 {
@@ -165,7 +165,16 @@ fn walk(
         }
     }
     let git_root = dir.join(".git").is_dir();
-    if git_root || (!inside_project && !markers.is_empty()) {
+    let has_manifest = markers.iter().any(|m| *m != "README.md");
+    let has_nested_git = fs::read_dir(dir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|entry| entry.ok())
+        .any(|entry| entry.path().join(".git").is_dir());
+    if (git_root && !is_scan_root && !(markers.is_empty() && has_nested_git))
+        || (!inside_project && has_manifest)
+    {
         found.insert(dir.to_path_buf());
     }
     for entry in fs::read_dir(dir)? {
@@ -178,10 +187,10 @@ fn walk(
             continue;
         }
         walk(
-            root,
             &entry.path(),
             depth + 1,
             inside_project || git_root,
+            false,
             found,
         )?;
     }
@@ -391,9 +400,11 @@ mod tests {
     fn audit_distinguishes_missing_empty_and_ready() {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("README.md"), "root").unwrap();
+        fs::write(dir.path().join("Cargo.toml"), "[package]\nname=\"root\"\nversion=\"0.1.0\"\n").unwrap();
         let ready = dir.path().join("ready");
         fs::create_dir_all(ready.join(".skillastic/skills")).unwrap();
         fs::write(ready.join("README.md"), "ready").unwrap();
+        fs::write(ready.join("Cargo.toml"), "[package]\nname=\"ready\"\nversion=\"0.1.0\"\n").unwrap();
         fs::write(ready.join("config.json"), "{}").unwrap_or(());
         fs::write(ready.join(".skillastic/config.json"), "{}").unwrap();
         fs::write(ready.join(".skillastic/state.json"), "{}").unwrap();
