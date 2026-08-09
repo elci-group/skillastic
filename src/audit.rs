@@ -338,9 +338,9 @@ fn infer_recommendations(root: &Path, projects: &[ProjectAudit], model: &str) ->
         bundle.push('\n');
     }
     let prompt = format!(
-        "Return JSON array only. Each item must have path, priority (high|medium|low), rationale. Identify which projects should receive a .skillastic workspace next. Do not invent projects. Deterministic audit is authoritative; use this bundle only to prioritize.\n{bundle}"
+        "Return a JSON object with a recommendations array. Each item must have path, priority (high|medium|low), rationale. Identify which projects should receive a .skillastic workspace next. Do not invent projects. Deterministic audit is authoritative; use this bundle only to prioritize.\n{bundle}"
     );
-    let payload = serde_json::json!({"model": model, "temperature": 0, "messages": [{"role": "system", "content": "You audit software project metadata."}, {"role": "user", "content": prompt}]});
+    let payload = serde_json::json!({"model": model, "temperature": 0, "response_format": {"type": "json_object"}, "messages": [{"role": "system", "content": "You audit software project metadata."}, {"role": "user", "content": prompt}]});
     let key = key.to_string_lossy();
     let output = Command::new("curl")
         .args([
@@ -382,7 +382,11 @@ fn infer_recommendations(root: &Path, projects: &[ProjectAudit], model: &str) ->
         .strip_suffix("```")
         .unwrap_or(text)
         .trim();
-    match serde_json::from_str::<Vec<InferenceRecommendation>>(clean) {
+    let parsed = serde_json::from_str::<serde_json::Value>(clean).and_then(|value| {
+        let value = value.get("recommendations").cloned().unwrap_or(value);
+        serde_json::from_value::<Vec<InferenceRecommendation>>(value)
+    });
+    match parsed {
         Ok(items) => {
             report.status = "complete".into();
             report.recommendations = items;
