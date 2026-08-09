@@ -3,6 +3,7 @@ use serde::Serialize;
 use skillastic::SkillasticError;
 use skillastic::appver;
 use skillastic::archaeology::Archaeology;
+use skillastic::audit;
 use skillastic::capture::Capture;
 use skillastic::daemon::{Daemon, recent_events};
 use skillastic::error::Result;
@@ -118,6 +119,22 @@ enum Command {
 
     /// Show recent daemon events recorded in the workspace state.
     Events,
+
+    /// Audit project roots for missing or incomplete .skillastic workspaces.
+    Audit {
+        /// Directory to scan (defaults to the current directory).
+        #[arg(long, default_value = ".")]
+        root: PathBuf,
+        /// Additional project-source directory; repeat for multiple sources.
+        #[arg(long = "source")]
+        sources: Vec<PathBuf>,
+        /// Ask Groq to prioritize deterministic findings using bound context.
+        #[arg(long)]
+        infer: bool,
+        /// Groq model used for advisory prioritization.
+        #[arg(long, default_value = "llama-3.1-8b-instant")]
+        model: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -497,6 +514,51 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             } else {
                 for event in &events {
                     println!("{event}");
+                }
+            }
+        }
+
+        Command::Audit {
+            root,
+            sources,
+            infer,
+            model,
+        } => {
+            let root = if root.is_absolute() {
+                root
+            } else {
+                project_root.join(root)
+            };
+            let sources = sources
+                .into_iter()
+                .map(|source| {
+                    if source.is_absolute() {
+                        source
+                    } else {
+                        project_root.join(source)
+                    }
+                })
+                .collect::<Vec<_>>();
+            let report = audit::run(&root, &sources, infer, &model)?;
+            if json {
+                print_json(&report);
+            } else {
+                println!(
+                    "Audited {} project(s) under {}",
+                    report.totals.projects, report.root
+                );
+                for project in &report.projects {
+                    println!(
+                        "{:14} {}",
+                        format!("{:?}", project.workspace.state).to_lowercase(),
+                        project.path
+                    );
+                    for reason in &project.workspace.reasons {
+                        println!("  - {reason}");
+                    }
+                }
+                if let Some(inference) = report.inference {
+                    println!("Groq inference: {}", inference.status);
                 }
             }
         }

@@ -7,6 +7,7 @@
 
 pub mod appver;
 pub mod archaeology;
+pub mod audit;
 pub mod capture;
 pub mod daemon;
 pub mod delta;
