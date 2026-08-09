@@ -177,7 +177,13 @@ fn walk(
         if name.starts_with('.') || IGNORED_DIRS.contains(&name.as_str()) {
             continue;
         }
-        walk(root, &entry.path(), depth + 1, inside_project || git_root, found)?;
+        walk(
+            root,
+            &entry.path(),
+            depth + 1,
+            inside_project || git_root,
+            found,
+        )?;
     }
     Ok(())
 }
