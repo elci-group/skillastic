@@ -144,11 +144,17 @@ pub fn run(
 
 fn discover_projects(root: &Path) -> Result<Vec<PathBuf>> {
     let mut found = BTreeSet::new();
-    walk(root, root, 0, &mut found)?;
+    walk(root, root, 0, false, &mut found)?;
     Ok(found.into_iter().collect())
 }
 
-fn walk(root: &Path, dir: &Path, depth: usize, found: &mut BTreeSet<PathBuf>) -> Result<()> {
+fn walk(
+    root: &Path,
+    dir: &Path,
+    depth: usize,
+    inside_project: bool,
+    found: &mut BTreeSet<PathBuf>,
+) -> Result<()> {
     if depth > 3 {
         return Ok(());
     }
@@ -158,13 +164,9 @@ fn walk(root: &Path, dir: &Path, depth: usize, found: &mut BTreeSet<PathBuf>) ->
             markers.push(*marker);
         }
     }
-    if dir.join(".git").is_dir() || !markers.is_empty() {
+    let git_root = dir.join(".git").is_dir();
+    if git_root || (!inside_project && !markers.is_empty()) {
         found.insert(dir.to_path_buf());
-        // A project root owns its nested source tree. Nested git roots are
-        // still discovered, but ordinary workspace packages are not.
-        if dir.join(".git").is_dir() {
-            return Ok(());
-        }
     }
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
@@ -175,7 +177,7 @@ fn walk(root: &Path, dir: &Path, depth: usize, found: &mut BTreeSet<PathBuf>) ->
         if name.starts_with('.') || IGNORED_DIRS.contains(&name.as_str()) {
             continue;
         }
-        walk(root, &entry.path(), depth + 1, found)?;
+        walk(root, &entry.path(), depth + 1, inside_project || git_root, found)?;
     }
     Ok(())
 }
