@@ -324,8 +324,8 @@ fn infer_recommendations(root: &Path, projects: &[ProjectAudit], model: &str) ->
                 "2",
                 "--token-limit",
                 "1200",
-                &path.display().to_string(),
             ])
+            .current_dir(&path)
             .output();
         if let Ok(output) = output {
             if output.status.success() {
@@ -375,7 +375,8 @@ fn infer_recommendations(root: &Path, projects: &[ProjectAudit], model: &str) ->
         .trim();
     let clean = text
         .strip_prefix("```json")
-        .and_then(|s| s.strip_suffix("``` "))
+        .unwrap_or(text)
+        .strip_suffix("```")
         .unwrap_or(text)
         .trim();
     match serde_json::from_str::<Vec<InferenceRecommendation>>(clean) {
@@ -400,11 +401,19 @@ mod tests {
     fn audit_distinguishes_missing_empty_and_ready() {
         let dir = TempDir::new().unwrap();
         fs::write(dir.path().join("README.md"), "root").unwrap();
-        fs::write(dir.path().join("Cargo.toml"), "[package]\nname=\"root\"\nversion=\"0.1.0\"\n").unwrap();
+        fs::write(
+            dir.path().join("Cargo.toml"),
+            "[package]\nname=\"root\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
         let ready = dir.path().join("ready");
         fs::create_dir_all(ready.join(".skillastic/skills")).unwrap();
         fs::write(ready.join("README.md"), "ready").unwrap();
-        fs::write(ready.join("Cargo.toml"), "[package]\nname=\"ready\"\nversion=\"0.1.0\"\n").unwrap();
+        fs::write(
+            ready.join("Cargo.toml"),
+            "[package]\nname=\"ready\"\nversion=\"0.1.0\"\n",
+        )
+        .unwrap();
         fs::write(ready.join("config.json"), "{}").unwrap_or(());
         fs::write(ready.join(".skillastic/config.json"), "{}").unwrap();
         fs::write(ready.join(".skillastic/state.json"), "{}").unwrap();
