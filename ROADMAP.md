@@ -44,3 +44,19 @@ Exit review: weighted score is at least 87, no release-blocking checks fail, and
 ## Final review
 
 The project reached **89/100 (B+)**: functionality 27/30, tests and automation 18/20, maintainability 13/15, security and dependencies 9/10, documentation and onboarding 14/15, and repository/release hygiene 8/10. All defined delivery gates pass, including the Rust 1.85 minimum-version check and all 18 benchmark reference checks.
+
+## PADAGONIA enterprise integration
+
+See [`/home/sal/padagonia/docs/enterprise-integration-directives.md`](../padagonia/docs/enterprise-integration-directives.md).
+
+- [ ] `schema_registry`: version skill, capability, compatibility, and lifecycle
+  entities before enabling graph writes.
+- [ ] `lifecycle_writer`: record install, pin, upgrade, deprecation, failure,
+  and rollback assertions with producer/version provenance.
+- [ ] `compatibility_reader`: use filtered and vector retrieval for task-to-skill
+  matching, while keeping activation policy local and explicit.
+- [ ] `replay_tests`: prove deterministic lifecycle reconstruction after retry,
+  snapshot restore, and conflicting skill assertions.
+
+Exit gate: no skill transition is silently overwritten, and an offline runtime
+can continue with a bounded local cache and a visible stale-data indicator.
