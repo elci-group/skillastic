@@ -6,6 +6,39 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::fmt;
 
+/// Who can invoke a skill.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SkillInvocation {
+    /// Only the human types its name.
+    UserInvoked,
+    /// The model may reach for it automatically.
+    ModelInvoked,
+    /// Either the human or the model may invoke it.
+    Both,
+}
+
+impl fmt::Display for SkillInvocation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::UserInvoked => "user_invoked",
+            Self::ModelInvoked => "model_invoked",
+            Self::Both => "both",
+        };
+        f.write_str(s)
+    }
+}
+
+impl Default for SkillInvocation {
+    fn default() -> Self {
+        Self::Both
+    }
+}
+
+fn default_bucket() -> String {
+    "core".into()
+}
+
 /// A living skill object with lineage, per the Skillastic spec.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Skill {
