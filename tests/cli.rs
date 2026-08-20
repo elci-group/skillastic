@@ -28,7 +28,9 @@ fn help_exposes_the_core_workflow() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     for command in [
-        "init", "add", "status", "capture", "audit", "migrate", "verify", "history",
+        "init", "setup", "add", "remove", "list", "show", "status", "capture", "audit",
+        "migrate", "verify", "history", "promoted", "lint", "doctor", "domain-model",
+        "adr", "docs", "search",
     ] {
         assert!(stdout.contains(command), "help omitted {command}");
     }
@@ -71,12 +73,25 @@ fn json_lifecycle_round_trip() {
     assert_eq!(added["verified_app_version"], "1.2.3");
 
     let listed = success_json(&dir, &["list", "--json"]);
-    assert_eq!(listed.as_array().unwrap().len(), 1);
-    assert_eq!(listed[0]["name"], "frontend");
+    // ask-skillastic is seeded on init, plus the skill we added.
+    assert_eq!(listed.as_array().unwrap().len(), 2);
+    let frontend = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "frontend")
+        .expect("frontend skill should be listed");
+    assert_eq!(frontend["status"], "active");
 
     let status = success_json(&dir, &["status", "--app-version", "1.2.3", "--json"]);
     assert_eq!(status["app_version"], "1.2.3");
-    assert_eq!(status["resolutions"][0]["decision"], "load");
+    let frontend_resolution = status["resolutions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|r| r["skill"] == "frontend")
+        .expect("frontend should have a resolution");
+    assert_eq!(frontend_resolution["decision"], "load");
 
     let history = success_json(&dir, &["history", "frontend", "--json"]);
     assert_eq!(history.as_array().unwrap().len(), 1);
@@ -124,5 +139,13 @@ fn invalid_compatibility_range_is_rejected_without_registering_a_skill() {
     );
 
     let listed = success_json(&dir, &["list", "--json"]);
-    assert!(listed.as_array().unwrap().is_empty());
+    // ask-skillastic is seeded on init; the broken skill must not appear.
+    assert!(
+        !listed
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["name"] == "broken"),
+        "broken skill should not be registered"
+    );
 }

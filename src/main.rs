@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use skillastic::SkillasticError;
 use skillastic::appver;
@@ -6,11 +6,18 @@ use skillastic::archaeology::Archaeology;
 use skillastic::audit;
 use skillastic::capture::Capture;
 use skillastic::daemon::{Daemon, recent_events};
+use skillastic::docs;
+use skillastic::domain;
+use skillastic::doctor;
 use skillastic::error::Result;
+use skillastic::lint;
 use skillastic::migrate::{Migrator, verify};
-use skillastic::model::{Config, Decision, Skill};
+use skillastic::model::{Config, Decision, Skill, SkillInvocation};
 use skillastic::registry::Registry;
 use skillastic::resolver::{Resolver, parse_req};
+use skillastic::search;
+use skillastic::setup;
+use skillastic::templates;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -34,6 +41,23 @@ struct Cli {
     command: Command,
 }
 
+#[derive(Clone, ValueEnum)]
+enum InvocationArg {
+    User,
+    Model,
+    Both,
+}
+
+impl From<InvocationArg> for SkillInvocation {
+    fn from(arg: InvocationArg) -> Self {
+        match arg {
+            InvocationArg::User => SkillInvocation::UserInvoked,
+            InvocationArg::Model => SkillInvocation::ModelInvoked,
+            InvocationArg::Both => SkillInvocation::Both,
+        }
+    }
+}
+
 #[derive(Subcommand)]
 enum Command {
     /// Initialize a .skillastic workspace in the current project.
@@ -41,6 +65,19 @@ enum Command {
         /// Application name (defaults to the directory name).
         #[arg(long)]
         app_name: Option<String>,
+        /// Project-type template to seed (rust, node, python, go).
+        #[arg(long)]
+        template: Option<String>,
+    },
+
+    /// Configure this repo for the Skillastic skills (issue tracker, triage labels, domain docs).
+    Setup {
+        /// Skip interactive prompts and use defaults.
+        #[arg(long)]
+        non_interactive: bool,
+        /// Issue tracker provider when using --non-interactive.
+        #[arg(long)]
+        issue_tracker: Option<String>,
     },
 
     /// Register a new skill.
@@ -56,9 +93,27 @@ enum Command {
         /// Markdown file with the skill's instruction body.
         #[arg(long)]
         body: Option<PathBuf>,
+        /// Built-in skill template to use as the body.
+        #[arg(long)]
+        template: Option<String>,
         /// Mark the skill verified against the current app version.
         #[arg(long)]
         verify: bool,
+        /// Bucket for the skill.
+        #[arg(long, value_enum, default_value = "core")]
+        bucket: String,
+        /// Who can invoke the skill.
+        #[arg(long, value_enum, default_value = "both")]
+        invocation: InvocationArg,
+        /// Other skills this skill requires. Repeatable.
+        #[arg(long)]
+        requires: Vec<String>,
+    },
+
+    /// Remove a skill.
+    Remove {
+        /// Skill name.
+        name: String,
     },
 
     /// List registered skills.
@@ -68,6 +123,9 @@ enum Command {
     Show {
         /// Skill name.
         name: String,
+        /// Render the human-facing docs page instead of raw metadata.
+        #[arg(long)]
+        docs: bool,
     },
 
     /// Version-resolver report for all skills vs. the current app version.
@@ -84,7 +142,11 @@ enum Command {
     },
 
     /// Capture the current codebase context fingerprint.
-    Capture,
+    Capture {
+        /// Extract candidate domain terms from source files.
+        #[arg(long)]
+        domain: bool,
+    },
 
     /// Migrate a skill (or --all) to the current app version.
     Migrate {
@@ -135,6 +197,49 @@ enum Command {
         #[arg(long, default_value = "llama-3.1-8b-instant")]
         model: String,
     },
+
+    /// List and validate the promoted skill set.
+    Promoted,
+
+    /// Lint the workspace and its skills.
+    Lint {
+        /// Also run domain-language checks against CONTEXT.md.
+        #[arg(long)]
+        domain: bool,
+    },
+
+    /// Check workspace health and report actionable fixes.
+    Doctor,
+
+    /// Generate or update the project's CONTEXT.md domain glossary.
+    DomainModel,
+
+    /// Create a new architectural decision record.
+    Adr {
+        /// Short title for the decision.
+        title: String,
+    },
+
+    /// Generate or render human-facing docs pages for skills.
+    Docs {
+        #[command(subcommand)]
+        action: DocsAction,
+    },
+
+    /// Search registered skills by name, bucket, or body text.
+    Search {
+        /// Query string.
+        query: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum DocsAction {
+    /// Generate a docs page for a skill.
+    Generate {
+        /// Skill name.
+        name: String,
+    },
 }
 
 fn main() -> ExitCode {
@@ -154,7 +259,7 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
     let app_version_override = cli.app_version.as_deref();
 
     match cli.command {
-        Command::Init { app_name } => {
+        Command::Init { app_name, template } => {
             let name = app_name.unwrap_or_else(|| {
                 project_root
                     .file_name()
@@ -171,6 +276,31 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 ..Default::default()
             };
             let registry = Registry::init(project_root, config)?;
+
+            // Seed project-type template skill if requested.
+            let seeded_template = template.as_deref();
+            if let Some(template_name) = seeded_template {
+                if let Some(body) = templates::project_template_body(template_name) {
+                    let mut skill = Skill::new(
+                        template_name,
+                        appver::parse("1.0.0")?,
+                        vec![],
+                        app_version_override
+                            .map(appver::parse)
+                            .transpose()?
+                            .unwrap_or_else(|| semver::Version::new(0, 0, 0)),
+                    );
+                    skill.invocation = SkillInvocation::UserInvoked;
+                    skill.bucket = "core".into();
+                    registry.add_skill(&skill, body)?;
+                } else {
+                    return Err(SkillasticError::Other(format!(
+                        "unknown template '{template_name}'; choose one of: {}",
+                        templates::PROJECT_TEMPLATES.join(", ")
+                    )));
+                }
+            }
+
             if json {
                 print_json(&serde_json::json!({
                     "initialized": registry.root(),
@@ -181,6 +311,26 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                     "Initialized skillastic workspace for '{name}' in {}",
                     registry.root().display()
                 );
+                if let Some(template_name) = seeded_template {
+                    println!("Seeded template skill: {template_name}");
+                }
+            }
+        }
+
+        Command::Setup {
+            non_interactive,
+            issue_tracker,
+        } => {
+            let registry = open_registry(project_root)?;
+            setup::run(
+                &registry,
+                setup::SetupOptions {
+                    non_interactive,
+                    issue_tracker,
+                },
+            )?;
+            if !json {
+                println!("Setup complete. See .skillastic/agents/");
             }
         }
 
@@ -189,7 +339,11 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             version,
             compatible,
             body,
+            template,
             verify: verify_now,
+            bucket,
+            invocation,
+            requires,
         } => {
             let registry = open_registry(project_root)?;
             let config = registry.config()?;
@@ -197,6 +351,26 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             for range in &compatible {
                 parse_req(range)?; // fail fast on garbage ranges
             }
+
+            let body_text = match (body, template) {
+                (Some(path), None) => std::fs::read_to_string(path)?,
+                (None, Some(template_name)) => {
+                    templates::workflow_skill_body(&template_name)
+                        .ok_or_else(|| {
+                            SkillasticError::Other(format!(
+                                "unknown template '{template_name}'; choose one of: ask-skillastic, tdd, code-review, diagnosing-bugs, to-spec, to-tickets, implement, triage, handoff"
+                            ))
+                        })?
+                        .to_string()
+                }
+                (Some(_), Some(_)) => {
+                    return Err(SkillasticError::Other(
+                        "pass --body or --template, not both".into(),
+                    ))
+                }
+                (None, None) => format!("# {name}\n\nDescribe how to work with this subsystem.\n"),
+            };
+
             let mut skill = Skill::new(
                 &name,
                 appver::parse(&version)?,
@@ -204,14 +378,14 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 app_version.clone(),
             );
             skill.context = Capture::scan(project_root)?;
-            let body = match body {
-                Some(path) => std::fs::read_to_string(path)?,
-                None => format!("# {name}\n\nDescribe how to work with this subsystem.\n"),
-            };
-            registry.add_skill(&skill, &body)?;
+            skill.bucket = bucket;
+            skill.invocation = invocation.into();
+            skill.requires = requires;
+            registry.add_skill(&skill, &body_text)?;
             if verify_now {
                 skill = verify(&registry, &name, &app_version)?;
             }
+            registry.regenerate_bucket_readmes()?;
             if json {
                 print_json(&skill);
             } else {
@@ -219,6 +393,15 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                     "Registered skill '{}' v{} against app {app_version} (status: {})",
                     skill.name, skill.skill_version, skill.status
                 );
+            }
+        }
+
+        Command::Remove { name } => {
+            let registry = open_registry(project_root)?;
+            registry.remove_skill(&name)?;
+            registry.regenerate_bucket_readmes()?;
+            if !json {
+                println!("Removed skill '{name}'");
             }
         }
 
@@ -236,6 +419,8 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                         vec![
                             s.name.clone(),
                             s.skill_version.to_string(),
+                            s.bucket.clone(),
+                            s.invocation.to_string(),
                             s.status.to_string(),
                             format!("{:.2}", s.confidence),
                             s.compatible_apps.join(" | "),
@@ -249,6 +434,8 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                         &[
                             "SKILL",
                             "VERSION",
+                            "BUCKET",
+                            "INVOCATION",
                             "STATUS",
                             "CONF",
                             "COMPATIBLE APPS",
@@ -260,15 +447,20 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             }
         }
 
-        Command::Show { name } => {
+        Command::Show { name, docs } => {
             let registry = open_registry(project_root)?;
-            let skill = registry.load_skill(&name)?;
-            if json {
-                print_json(&skill);
+            if docs {
+                let page = docs::render(&registry, &name)?;
+                println!("{page}");
             } else {
-                println!("{}", serde_json::to_string_pretty(&skill)?);
-                let body = registry.skill_body(&skill)?;
-                println!("\n--- body ({}) ---\n{body}", skill.body_path);
+                let skill = registry.load_skill(&name)?;
+                if json {
+                    print_json(&skill);
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&skill)?);
+                    let body = registry.skill_body(&skill)?;
+                    println!("\n--- body ({}) ---\n{body}", skill.body_path);
+                }
             }
         }
 
@@ -371,12 +563,24 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             }
         }
 
-        Command::Capture => {
-            let fp = Capture::scan(project_root)?;
-            if json {
-                print_json(&fp);
+        Command::Capture { domain } => {
+            if domain {
+                let terms = domain::capture_domain_terms(project_root);
+                if json {
+                    print_json(&serde_json::json!({ "domain_terms": terms }));
+                } else {
+                    println!("Candidate domain terms:");
+                    for term in terms {
+                        println!("  - {term}");
+                    }
+                }
             } else {
-                println!("{}", serde_json::to_string_pretty(&fp)?);
+                let fp = Capture::scan(project_root)?;
+                if json {
+                    print_json(&fp);
+                } else {
+                    println!("{}", serde_json::to_string_pretty(&fp)?);
+                }
             }
         }
 
@@ -386,21 +590,20 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             let app_version = appver::detect(project_root, &config, app_version_override)?;
             let migrator = Migrator::new(&registry);
 
-            let targets: Vec<String> =
-                if all {
-                    let arch = Archaeology::new(project_root).ok();
-                    let resolver = Resolver::new(arch.as_ref(), &app_version);
-                    resolver
-                        .resolve_all(&registry.list_skills()?, &app_version)?
-                        .into_iter()
-                        .filter(|r| r.decision == Decision::Migrate)
-                        .map(|r| r.skill)
-                        .collect()
-                } else {
-                    vec![name.ok_or_else(|| {
-                        SkillasticError::Other("pass a skill name or --all".into())
-                    })?]
-                };
+            let targets: Vec<String> = if all {
+                let arch = Archaeology::new(project_root).ok();
+                let resolver = Resolver::new(arch.as_ref(), &app_version);
+                resolver
+                    .resolve_all(&registry.list_skills()?, &app_version)?
+                    .into_iter()
+                    .filter(|r| r.decision == Decision::Migrate)
+                    .map(|r| r.skill)
+                    .collect()
+            } else {
+                vec![name.ok_or_else(|| {
+                    SkillasticError::Other("pass a skill name or --all".into())
+                })?]
+            };
 
             if targets.is_empty() {
                 println!("Nothing to migrate.");
@@ -560,6 +763,105 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 if let Some(inference) = report.inference {
                     println!("Groq inference: {}", inference.status);
                 }
+            }
+        }
+
+        Command::Promoted => {
+            let registry = open_registry(project_root)?;
+            let set = registry.promoted()?;
+            let skills = registry.list_skills()?;
+            let names: std::collections::HashSet<String> =
+                skills.iter().map(|s| s.name.clone()).collect();
+            let missing: Vec<&String> = set.skills.iter().filter(|s| !names.contains(*s)).collect();
+            if json {
+                print_json(&serde_json::json!({
+                    "skills": set.skills,
+                    "missing": missing,
+                }));
+            } else {
+                println!("Promoted skills:");
+                for name in &set.skills {
+                    let status = if names.contains(name) { "" } else { " [missing]" };
+                    println!("  - {name}{status}");
+                }
+                if !missing.is_empty() {
+                    return Err(SkillasticError::Other(format!(
+                        "{} promoted skill(s) are not registered",
+                        missing.len()
+                    )));
+                }
+            }
+        }
+
+        Command::Lint { domain } => {
+            let registry = open_registry(project_root)?;
+            let report = lint::lint(&registry, domain)?;
+            if json {
+                print_json(&report.violations);
+            } else if report.violations.is_empty() {
+                println!("No lint violations.");
+            } else {
+                println!("Lint violations:");
+                for v in &report.violations {
+                    println!("  - {v}");
+                }
+            }
+        }
+
+        Command::Doctor => {
+            let registry = open_registry(project_root)?;
+            let diagnosis = doctor::diagnose(&registry)?;
+            if json {
+                print_json(&serde_json::json!({
+                    "healthy": diagnosis.healthy,
+                    "findings": diagnosis.findings,
+                }));
+            } else if diagnosis.healthy {
+                println!("Workspace is healthy.");
+            } else {
+                println!("Workspace issues:");
+                for finding in &diagnosis.findings {
+                    println!("  - {finding}");
+                }
+            }
+        }
+
+        Command::DomainModel => {
+            let registry = open_registry(project_root)?;
+            let path = domain::ensure_context_md(&registry)?;
+            if !json {
+                println!("Domain glossary: {}", path.display());
+                println!("Edit CONTEXT.md to add terms, then run `skillastic lint --domain`.");
+            }
+        }
+
+        Command::Adr { title } => {
+            let registry = open_registry(project_root)?;
+            let path = domain::create_adr(&registry, &title)?;
+            if !json {
+                println!("Created ADR: {}", path.display());
+            }
+        }
+
+        Command::Docs { action } => match action {
+            DocsAction::Generate { name } => {
+                let registry = open_registry(project_root)?;
+                let path = docs::generate(&registry, &name)?;
+                if !json {
+                    println!("Generated docs page: {}", path.display());
+                }
+            }
+        },
+
+        Command::Search { query } => {
+            let registry = open_registry(project_root)?;
+            let hits = search::search(&registry, &query)?;
+            if json {
+                print_json(&hits);
+            } else if hits.is_empty() {
+                println!("No skills matched '{query}'.");
+            } else {
+                print!("{}", search::hits_to_table(&hits));
             }
         }
     }

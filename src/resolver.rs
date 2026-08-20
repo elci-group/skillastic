@@ -14,6 +14,7 @@ use crate::archaeology::Archaeology;
 use crate::error::{Result, SkillasticError};
 use crate::model::{Decision, Resolution, Skill, VersionDelta};
 use semver::{Version, VersionReq};
+use std::collections::HashSet;
 
 /// Knowledge of dependency movement between the two app versions.
 /// `None` = unknown (no git history available).
@@ -46,22 +47,45 @@ impl<'a> Resolver<'a> {
         Some(arch.deps_changed(&from_ref, self.to_ref.as_deref()?))
     }
 
-    pub fn resolve(&self, skill: &Skill, to_app: &Version) -> Result<Resolution> {
+    pub fn resolve(&self, skill: &Skill, to_app: &Version, known_names: &HashSet<String>) -> Result<Resolution> {
         resolve(
             skill,
             to_app,
             self.deps_changed_for(&skill.verified_app_version),
+            Some(known_names),
         )
     }
 
     pub fn resolve_all(&self, skills: &[Skill], to_app: &Version) -> Result<Vec<Resolution>> {
-        skills.iter().map(|s| self.resolve(s, to_app)).collect()
+        let known_names: HashSet<String> = skills.iter().map(|s| s.name.clone()).collect();
+        skills
+            .iter()
+            .map(|s| self.resolve(s, to_app, &known_names))
+            .collect()
     }
 }
 
-pub fn resolve(skill: &Skill, to_app: &Version, deps_changed: DepsChanged) -> Result<Resolution> {
+pub fn resolve(
+    skill: &Skill,
+    to_app: &Version,
+    deps_changed: DepsChanged,
+    known_names: Option<&HashSet<String>>,
+) -> Result<Resolution> {
     let from_app = skill.verified_app_version.clone();
     let delta = VersionDelta::between(&from_app, to_app);
+
+    // Dependency satisfiability check.
+    if let Some(names) = known_names {
+        if let Some(missing) = skill.requires.iter().find(|r| !names.contains(*r)) {
+            return Ok(Resolution {
+                skill: skill.name.clone(),
+                from_app,
+                to_app: to_app.clone(),
+                decision: Decision::Incompatible,
+                reason: format!("required skill '{missing}' is not registered"),
+            });
+        }
+    }
 
     let mut saw_valid_req = false;
     let mut in_range = false;
@@ -138,9 +162,10 @@ pub fn resolve_all(
     to_app: &Version,
     deps_changed: DepsChanged,
 ) -> Result<Vec<Resolution>> {
+    let known_names: HashSet<String> = skills.iter().map(|s| s.name.clone()).collect();
     skills
         .iter()
-        .map(|s| resolve(s, to_app, deps_changed))
+        .map(|s| resolve(s, to_app, deps_changed, Some(&known_names)))
         .collect()
 }
 
@@ -170,7 +195,7 @@ mod tests {
     }
 
     fn decide(skill: &Skill, to: &str, deps: DepsChanged) -> Decision {
-        resolve(skill, &v(to), deps).unwrap().decision
+        resolve(skill, &v(to), deps, None).unwrap().decision
     }
 
     #[test]
@@ -200,6 +225,16 @@ mod tests {
     fn garbage_range_is_incompatible() {
         let s = skill("not-a-version", "2.4.1");
         assert_eq!(decide(&s, "2.4.1", None), Decision::Incompatible);
+    }
+
+    #[test]
+    fn missing_dependency_is_incompatible() {
+        let mut s = Skill::new("s", v("1.0.0"), vec![">=2.0.0, <3.0.0".into()], v("2.4.1"));
+        s.requires = vec!["missing-dep".into()];
+        let known = HashSet::from(["s".into()]);
+        let res = resolve(&s, &v("2.4.1"), None, Some(&known)).unwrap();
+        assert_eq!(res.decision, Decision::Incompatible);
+        assert!(res.reason.contains("missing-dep"));
     }
 
     #[test]
