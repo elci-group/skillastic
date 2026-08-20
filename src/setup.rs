@@ -70,12 +70,12 @@ fn detect_or_ask_tracker(project_root: &Path) -> Result<String> {
     println!("  4. Local markdown");
     println!("  5. Other");
     print!("Choose (1-5, default 1): ");
-    io::stdout().flush().map_err(|e| SkillasticError::Io(e))?;
+    io::stdout().flush().map_err(SkillasticError::Io)?;
 
     let mut input = String::new();
     io::stdin()
         .read_line(&mut input)
-        .map_err(|e| SkillasticError::Io(e))?;
+        .map_err(SkillasticError::Io)?;
 
     let choice = input.trim();
     let provider = match choice {
