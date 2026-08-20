@@ -19,3 +19,4 @@ pub mod registry;
 pub mod resolver;
 
 pub use error::{Result, SkillasticError};
+pub use model::SkillInvocation;

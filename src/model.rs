@@ -370,6 +370,27 @@ mod tests {
         assert_eq!(back.parent.as_deref(), Some("frontend-react@2.3.0"));
         assert_eq!(back.mutation_history.len(), 1);
         assert_eq!(back.status, SkillStatus::NeedsValidation);
+        assert_eq!(back.invocation, SkillInvocation::Both);
+        assert_eq!(back.bucket, "core");
+        assert!(back.requires.is_empty());
+    }
+
+    #[test]
+    fn skill_defaults_for_backward_compatibility() {
+        let old = r#"{
+            "name": "legacy",
+            "skill_version": "1.0.0",
+            "compatible_apps": [],
+            "created": "2024-01-01T00:00:00Z",
+            "confidence": 0.5,
+            "status": "needs_validation",
+            "verified_app_version": "1.0.0",
+            "body_path": "legacy.md"
+        }"#;
+        let skill: Skill = serde_json::from_str(old).unwrap();
+        assert_eq!(skill.invocation, SkillInvocation::Both);
+        assert_eq!(skill.bucket, "core");
+        assert!(skill.requires.is_empty());
     }
 
     #[test]
