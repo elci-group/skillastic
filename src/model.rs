@@ -7,7 +7,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 
 /// Who can invoke a skill.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SkillInvocation {
     /// Only the human types its name.
@@ -15,6 +15,7 @@ pub enum SkillInvocation {
     /// The model may reach for it automatically.
     ModelInvoked,
     /// Either the human or the model may invoke it.
+    #[default]
     Both,
 }
 
@@ -26,12 +27,6 @@ impl fmt::Display for SkillInvocation {
             Self::Both => "both",
         };
         f.write_str(s)
-    }
-}
-
-impl Default for SkillInvocation {
-    fn default() -> Self {
-        Self::Both
     }
 }
 

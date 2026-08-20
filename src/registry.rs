@@ -341,7 +341,7 @@ impl Registry {
             let mut model_invoked = Vec::new();
             let mut both = Vec::new();
             for skill in &skills {
-                if &skill.bucket == *bucket {
+                if skill.bucket == *bucket {
                     match skill.invocation {
                         crate::model::SkillInvocation::UserInvoked => user_invoked.push(skill),
                         crate::model::SkillInvocation::ModelInvoked => model_invoked.push(skill),
