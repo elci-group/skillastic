@@ -64,6 +64,15 @@ pub struct Skill {
     pub context: ContextFingerprint,
     /// Path of the instruction body, relative to `.skillastic/skills/`.
     pub body_path: String,
+    /// Who can invoke this skill.
+    #[serde(default)]
+    pub invocation: SkillInvocation,
+    /// Other skills this skill depends on.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub requires: Vec<String>,
+    /// Bucket this skill belongs to, e.g. `core`, `engineering`, `productivity`.
+    #[serde(default = "default_bucket")]
+    pub bucket: String,
 }
 
 impl Skill {
@@ -87,6 +96,9 @@ impl Skill {
             verified_app_version,
             mutation_history: Vec::new(),
             context: ContextFingerprint::default(),
+            invocation: SkillInvocation::default(),
+            requires: Vec::new(),
+            bucket: default_bucket(),
         }
     }
 
