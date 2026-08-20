@@ -80,7 +80,10 @@ pub fn lint(registry: &Registry, domain: bool) -> Result<LintReport> {
 
         // Promoted skills should have a docs page.
         if promoted.skills.contains(&skill.name) {
-            let docs_path = registry.root().join("docs").join(format!("{}.md", skill.name));
+            let docs_path = registry
+                .root()
+                .join("docs")
+                .join(format!("{}.md", skill.name));
             if !docs_path.is_file() {
                 violations.push(format!(
                     "{}: promoted skill missing docs page at {}",

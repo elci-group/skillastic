@@ -28,9 +28,25 @@ fn help_exposes_the_core_workflow() {
 
     let stdout = String::from_utf8(output.stdout).unwrap();
     for command in [
-        "init", "setup", "add", "remove", "list", "show", "status", "capture", "audit",
-        "migrate", "verify", "history", "promoted", "lint", "doctor", "domain-model",
-        "adr", "docs", "search",
+        "init",
+        "setup",
+        "add",
+        "remove",
+        "list",
+        "show",
+        "status",
+        "capture",
+        "audit",
+        "migrate",
+        "verify",
+        "history",
+        "promoted",
+        "lint",
+        "doctor",
+        "domain-model",
+        "adr",
+        "docs",
+        "search",
     ] {
         assert!(stdout.contains(command), "help omitted {command}");
     }

@@ -21,7 +21,10 @@ pub fn run(registry: &Registry, options: SetupOptions) -> Result<()> {
     std::fs::create_dir_all(&agents_dir)?;
 
     let provider = if options.non_interactive {
-        options.issue_tracker.clone().unwrap_or_else(|| "github".into())
+        options
+            .issue_tracker
+            .clone()
+            .unwrap_or_else(|| "github".into())
     } else {
         detect_or_ask_tracker(&project_root)?
     };
@@ -45,10 +48,7 @@ pub fn run(registry: &Registry, options: SetupOptions) -> Result<()> {
         templates::TRIAGE_LABELS_MD_TEMPLATE,
     )?;
 
-    write_agent_doc(
-        &agents_dir.join("domain.md"),
-        templates::DOMAIN_MD_TEMPLATE,
-    )?;
+    write_agent_doc(&agents_dir.join("domain.md"), templates::DOMAIN_MD_TEMPLATE)?;
 
     // Ensure ADR directory exists.
     std::fs::create_dir_all(registry.root().join("adr"))?;

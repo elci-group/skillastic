@@ -21,7 +21,9 @@ pub fn diagnose(registry: &Registry) -> Result<Diagnosis> {
     ];
     for file in &setup_files {
         if !registry.root().join(file).is_file() {
-            findings.push(format!("missing setup file: .skillastic/{file}; run `skillastic setup`"));
+            findings.push(format!(
+                "missing setup file: .skillastic/{file}; run `skillastic setup`"
+            ));
         }
     }
 

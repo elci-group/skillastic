@@ -39,7 +39,10 @@ pub fn create_adr(registry: &Registry, title: &str) -> Result<PathBuf> {
         if !context.contains("## Decisions") {
             context.push_str("\n\n## Decisions\n\n");
         }
-        let link = format!("- [{:04}. {}](.skillastic/adr/{})\n", next_number, title, filename);
+        let link = format!(
+            "- [{:04}. {}](.skillastic/adr/{})\n",
+            next_number, title, filename
+        );
         if !context.contains(&filename) {
             context.push_str(&link);
             fs::write(&context_path, context)?;
@@ -118,10 +121,7 @@ pub fn context_terms(context_path: &Path) -> Vec<String> {
 /// Check whether a skill body contradicts a CONTEXT.md term.
 /// Returns pairs of (term, variant found) for cases where the body uses a
 /// different string than the canonical term.
-pub fn find_domain_contradictions(
-    body: &str,
-    terms: &[String],
-) -> Vec<(String, String)> {
+pub fn find_domain_contradictions(body: &str, terms: &[String]) -> Vec<(String, String)> {
     let mut contradictions = Vec::new();
     for term in terms {
         // Very simple heuristic: if the body contains a lowercase variant
@@ -166,7 +166,10 @@ mod tests {
 
     #[test]
     fn slugify_produces_clean_ids() {
-        assert_eq!(slugify("Use immutable snapshots"), "use-immutable-snapshots");
+        assert_eq!(
+            slugify("Use immutable snapshots"),
+            "use-immutable-snapshots"
+        );
         assert_eq!(slugify("Foo--bar!!"), "foo-bar");
     }
 
@@ -189,7 +192,11 @@ mod tests {
     fn context_terms_parse_bold_definitions() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("CONTEXT.md");
-        fs::write(&path, "## Language\n\n**Application version**:\nThe version string.\n").unwrap();
+        fs::write(
+            &path,
+            "## Language\n\n**Application version**:\nThe version string.\n",
+        )
+        .unwrap();
         let terms = context_terms(&path);
         assert_eq!(terms, vec!["Application version"]);
     }

@@ -13,7 +13,9 @@
 //! ```
 
 use crate::error::{Result, SkillasticError};
-use crate::model::{Config, DaemonState, Decision, Resolution, Skill, SkillInvocation, SkillStatus};
+use crate::model::{
+    Config, DaemonState, Decision, Resolution, Skill, SkillInvocation, SkillStatus,
+};
 use crate::templates;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -353,7 +355,11 @@ impl Registry {
             if !user_invoked.is_empty() {
                 lines.push("## User-invoked".into());
                 for skill in &user_invoked {
-                    let summary = self.skill_body(skill).ok().map(|body| first_line_summary(&body)).unwrap_or_else(|| skill.name.clone());
+                    let summary = self
+                        .skill_body(skill)
+                        .ok()
+                        .map(|body| first_line_summary(&body))
+                        .unwrap_or_else(|| skill.name.clone());
                     lines.push(format!("- **{}** — {}", skill.name, summary));
                 }
                 lines.push(String::new());
@@ -361,7 +367,11 @@ impl Registry {
             if !model_invoked.is_empty() {
                 lines.push("## Model-invoked".into());
                 for skill in &model_invoked {
-                    let summary = self.skill_body(skill).ok().map(|body| first_line_summary(&body)).unwrap_or_else(|| skill.name.clone());
+                    let summary = self
+                        .skill_body(skill)
+                        .ok()
+                        .map(|body| first_line_summary(&body))
+                        .unwrap_or_else(|| skill.name.clone());
                     lines.push(format!("- **{}** — {}", skill.name, summary));
                 }
                 lines.push(String::new());
@@ -369,7 +379,11 @@ impl Registry {
             if !both.is_empty() {
                 lines.push("## Both".into());
                 for skill in &both {
-                    let summary = self.skill_body(skill).ok().map(|body| first_line_summary(&body)).unwrap_or_else(|| skill.name.clone());
+                    let summary = self
+                        .skill_body(skill)
+                        .ok()
+                        .map(|body| first_line_summary(&body))
+                        .unwrap_or_else(|| skill.name.clone());
                     lines.push(format!("- **{}** — {}", skill.name, summary));
                 }
                 lines.push(String::new());
@@ -611,7 +625,11 @@ mod tests {
         registry.add_skill(&skill, "TDD skill body.").unwrap();
 
         registry.regenerate_bucket_readmes().unwrap();
-        let readme = registry.root().join(SKILLS).join("engineering").join("README.md");
+        let readme = registry
+            .root()
+            .join(SKILLS)
+            .join("engineering")
+            .join("README.md");
         assert!(readme.is_file());
         let text = fs::read_to_string(&readme).unwrap();
         assert!(text.contains("## Model-invoked"));

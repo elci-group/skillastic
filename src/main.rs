@@ -7,8 +7,8 @@ use skillastic::audit;
 use skillastic::capture::Capture;
 use skillastic::daemon::{Daemon, recent_events};
 use skillastic::docs;
-use skillastic::domain;
 use skillastic::doctor;
+use skillastic::domain;
 use skillastic::error::Result;
 use skillastic::lint;
 use skillastic::migrate::{Migrator, verify};
@@ -590,20 +590,21 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             let app_version = appver::detect(project_root, &config, app_version_override)?;
             let migrator = Migrator::new(&registry);
 
-            let targets: Vec<String> = if all {
-                let arch = Archaeology::new(project_root).ok();
-                let resolver = Resolver::new(arch.as_ref(), &app_version);
-                resolver
-                    .resolve_all(&registry.list_skills()?, &app_version)?
-                    .into_iter()
-                    .filter(|r| r.decision == Decision::Migrate)
-                    .map(|r| r.skill)
-                    .collect()
-            } else {
-                vec![name.ok_or_else(|| {
-                    SkillasticError::Other("pass a skill name or --all".into())
-                })?]
-            };
+            let targets: Vec<String> =
+                if all {
+                    let arch = Archaeology::new(project_root).ok();
+                    let resolver = Resolver::new(arch.as_ref(), &app_version);
+                    resolver
+                        .resolve_all(&registry.list_skills()?, &app_version)?
+                        .into_iter()
+                        .filter(|r| r.decision == Decision::Migrate)
+                        .map(|r| r.skill)
+                        .collect()
+                } else {
+                    vec![name.ok_or_else(|| {
+                        SkillasticError::Other("pass a skill name or --all".into())
+                    })?]
+                };
 
             if targets.is_empty() {
                 println!("Nothing to migrate.");
@@ -781,7 +782,11 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             } else {
                 println!("Promoted skills:");
                 for name in &set.skills {
-                    let status = if names.contains(name) { "" } else { " [missing]" };
+                    let status = if names.contains(name) {
+                        ""
+                    } else {
+                        " [missing]"
+                    };
                     println!("  - {name}{status}");
                 }
                 if !missing.is_empty() {

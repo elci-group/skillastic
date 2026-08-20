@@ -14,13 +14,16 @@ pub fn generate(registry: &Registry, name: &str) -> Result<PathBuf> {
 
     let mut contents = format!(
         "# {}\n\n",
-        name.split('-').map(|w| {
-            let mut c = w.chars();
-            match c.next() {
-                None => String::new(),
-                Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
-            }
-        }).collect::<Vec<_>>().join(" ")
+        name.split('-')
+            .map(|w| {
+                let mut c = w.chars();
+                match c.next() {
+                    None => String::new(),
+                    Some(f) => f.to_uppercase().collect::<String>() + c.as_str(),
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(" ")
     );
     contents.push_str(templates::DOCS_PAGE_TEMPLATE);
 

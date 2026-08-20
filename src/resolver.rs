@@ -47,7 +47,12 @@ impl<'a> Resolver<'a> {
         Some(arch.deps_changed(&from_ref, self.to_ref.as_deref()?))
     }
 
-    pub fn resolve(&self, skill: &Skill, to_app: &Version, known_names: &HashSet<String>) -> Result<Resolution> {
+    pub fn resolve(
+        &self,
+        skill: &Skill,
+        to_app: &Version,
+        known_names: &HashSet<String>,
+    ) -> Result<Resolution> {
         resolve(
             skill,
             to_app,
