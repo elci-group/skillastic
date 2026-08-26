@@ -209,9 +209,10 @@ pub struct DiscoveredRepo {
     pub has_skillastic: bool,
 }
 
-/// Finds git repos under `roots`, skipping build/dependency directories.
-/// Descends past repos it finds (a dotfiles-style repo at `$HOME` is common
-/// and must not swallow every project living underneath it).
+/// Finds git repos under `roots`, skipping build/dependency directories and
+/// any directory containing an [`IGNORE_MARKER`] file (and everything below
+/// it). Descends past repos it finds (a dotfiles-style repo at `$HOME` is
+/// common and must not swallow every project living underneath it).
 pub fn discover_repos(roots: &[PathBuf], max_depth: usize) -> Result<Vec<DiscoveredRepo>> {
     let mut found = Vec::new();
     for root in roots {
@@ -225,6 +226,9 @@ pub fn discover_repos(roots: &[PathBuf], max_depth: usize) -> Result<Vec<Discove
 fn walk(dir: &Path, depth: usize, max_depth: usize, found: &mut Vec<DiscoveredRepo>) {
     if depth > max_depth {
         return;
+    }
+    if dir.join(IGNORE_MARKER).is_file() {
+        return; // opted out: skip this directory and everything below it
     }
     if dir.join(".git").is_dir() {
         found.push(DiscoveredRepo {
