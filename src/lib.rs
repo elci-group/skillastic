@@ -22,6 +22,7 @@ pub mod lint;
 pub mod migrate;
 pub mod model;
 pub mod monitor;
+pub mod register;
 pub mod registry;
 pub mod resolver;
 pub mod search;

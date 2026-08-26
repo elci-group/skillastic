@@ -15,6 +15,7 @@ use skillastic::lint;
 use skillastic::migrate::{Migrator, verify};
 use skillastic::model::{Config, Decision, Skill, SkillInvocation};
 use skillastic::monitor::{self, MonitorRegistry, Scope};
+use skillastic::register;
 use skillastic::registry::Registry;
 use skillastic::resolver::{Resolver, parse_req};
 use skillastic::search;
