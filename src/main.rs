@@ -233,6 +233,63 @@ enum Command {
         /// Query string.
         query: String,
     },
+
+    /// First-time setup: discover local repos, install the daemon, and make
+    /// sure it survives logout/reboot.
+    Enroll {
+        /// Monitor every user's repos and autostart at boot instead of
+        /// login. Requires root.
+        #[arg(long)]
+        system: bool,
+        /// Directory to scan for repos (repeatable). Defaults to $HOME for
+        /// user scope, or /home for system scope.
+        #[arg(long = "root")]
+        roots: Vec<PathBuf>,
+        /// Poll interval for each enrolled daemon, in seconds.
+        #[arg(long, default_value_t = 300)]
+        interval: u64,
+        /// Also run `skillastic init` for discovered git repos that have no
+        /// .skillastic workspace yet, so they can be enrolled too.
+        #[arg(long)]
+        init_missing: bool,
+        /// Max directory depth to scan below each root.
+        #[arg(long, default_value_t = 6)]
+        max_depth: usize,
+        /// Report what would happen without installing or starting anything.
+        #[arg(long)]
+        dry_run: bool,
+    },
+
+    /// Manage the multi-repo daemon supervisor (used by the systemd unit
+    /// `enroll` installs; rarely invoked directly).
+    Monitor {
+        /// Operate on the system-wide registry instead of the per-user one.
+        #[arg(long, global = true)]
+        system: bool,
+        #[command(subcommand)]
+        action: MonitorAction,
+    },
+}
+
+#[derive(Subcommand)]
+enum MonitorAction {
+    /// Register a project for monitoring (defaults to the current directory).
+    Add {
+        path: Option<PathBuf>,
+        /// Poll interval in seconds.
+        #[arg(long, default_value_t = 300)]
+        interval: u64,
+    },
+    /// Unregister a project (defaults to the current directory).
+    Remove { path: Option<PathBuf> },
+    /// Show all registered projects and whether their daemon is running.
+    List,
+    /// Enable monitoring for a project (defaults to the current directory).
+    Enable { path: Option<PathBuf> },
+    /// Disable monitoring for a project (defaults to the current directory).
+    Disable { path: Option<PathBuf> },
+    /// Start daemons for all enabled, not-running projects.
+    Resume,
 }
 
 #[derive(Subcommand)]
@@ -860,6 +917,146 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             }
         },
 
+        Command::Enroll {
+            system,
+            roots,
+            interval,
+            init_missing,
+            max_depth,
+            dry_run,
+        } => {
+            let scope = if system { Scope::System } else { Scope::User };
+            let roots = if roots.is_empty() {
+                vec![default_scan_root(scope)?]
+            } else {
+                roots
+            };
+            let report = enroll::run(enroll::EnrollOptions {
+                scope,
+                roots,
+                interval,
+                init_missing,
+                max_depth,
+                dry_run,
+            })?;
+            if json {
+                print_json(&report);
+            } else {
+                let verb = if dry_run { "Would enroll" } else { "Enrolled" };
+                println!(
+                    "{verb} {} project(s) for {} monitoring.",
+                    report.enrolled.len(),
+                    report.scope
+                );
+                if !report.initialized.is_empty() {
+                    println!("Initialized new workspaces:");
+                    for p in &report.initialized {
+                        println!("  - {p}");
+                    }
+                }
+                if !report.skipped_no_workspace.is_empty() {
+                    println!(
+                        "Skipped (no .skillastic workspace; re-run with --init-missing, or `skillastic init` there):"
+                    );
+                    for p in &report.skipped_no_workspace {
+                        println!("  - {p}");
+                    }
+                }
+                if let (Some(bin), Some(unit)) = (&report.binary_path, &report.unit_path) {
+                    println!("Daemon binary: {bin}");
+                    println!("Systemd unit:  {unit}");
+                    let when = match scope {
+                        Scope::User => "at your next login",
+                        Scope::System => "at boot",
+                    };
+                    println!("The daemon is running now, and will restart automatically {when}.");
+                }
+            }
+        }
+
+        Command::Monitor { system, action } => {
+            let scope = if system { Scope::System } else { Scope::User };
+            match action {
+                MonitorAction::Add { path, interval } => {
+                    let path = resolve_monitor_path(path, project_root);
+                    let mut registry = MonitorRegistry::load(scope)?;
+                    registry.upsert(&path, interval);
+                    registry.save(scope)?;
+                    if !json {
+                        println!("Monitoring {}", path.display());
+                    }
+                }
+                MonitorAction::Remove { path } => {
+                    let path = resolve_monitor_path(path, project_root);
+                    let mut registry = MonitorRegistry::load(scope)?;
+                    let removed = registry.remove(&path);
+                    registry.save(scope)?;
+                    if !json {
+                        if removed {
+                            println!("Removed {}", path.display());
+                        } else {
+                            println!("Not monitored: {}", path.display());
+                        }
+                    }
+                }
+                MonitorAction::Enable { path } => {
+                    let path = resolve_monitor_path(path, project_root);
+                    let mut registry = MonitorRegistry::load(scope)?;
+                    registry.set_enabled(&path, true)?;
+                    registry.save(scope)?;
+                    if !json {
+                        println!("Enabled {}", path.display());
+                    }
+                }
+                MonitorAction::Disable { path } => {
+                    let path = resolve_monitor_path(path, project_root);
+                    let mut registry = MonitorRegistry::load(scope)?;
+                    registry.set_enabled(&path, false)?;
+                    registry.save(scope)?;
+                    if !json {
+                        println!("Disabled {}", path.display());
+                    }
+                }
+                MonitorAction::List => {
+                    let registry = MonitorRegistry::load(scope)?;
+                    if json {
+                        print_json(&registry);
+                    } else if registry.projects.is_empty() {
+                        println!("No projects registered. Use `skillastic enroll` or `skillastic monitor add`.");
+                    } else {
+                        let rows = registry
+                            .projects
+                            .values()
+                            .map(|p| {
+                                let pid = monitor::running_daemon_pid(&p.path);
+                                vec![
+                                    p.path.display().to_string(),
+                                    if p.enabled { "enabled".into() } else { "disabled".into() },
+                                    p.interval.to_string(),
+                                    pid.map(|id| format!("running ({id})"))
+                                        .unwrap_or_else(|| "stopped".into()),
+                                ]
+                            })
+                            .collect();
+                        print!(
+                            "{}",
+                            table(&["PATH", "STATE", "INTERVAL", "DAEMON"], rows)
+                        );
+                    }
+                }
+                MonitorAction::Resume => {
+                    let outcomes = monitor::resume(scope)?;
+                    if json {
+                        print_json(&outcomes);
+                    } else {
+                        for outcome in &outcomes {
+                            println!("{}", outcome.describe());
+                        }
+                    }
+                }
+            }
+        }
+
         Command::Search { query } => {
             let registry = open_registry(project_root)?;
             let hits = search::search(&registry, &query)?;
@@ -877,6 +1074,22 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
 
 fn open_registry(project_root: &Path) -> Result<Registry> {
     Registry::open(project_root)
+}
+
+fn default_scan_root(scope: Scope) -> Result<PathBuf> {
+    match scope {
+        Scope::User => {
+            let home = std::env::var("HOME")
+                .map_err(|_| skillastic::SkillasticError::Other("$HOME is not set".into()))?;
+            Ok(PathBuf::from(home))
+        }
+        Scope::System => Ok(PathBuf::from("/home")),
+    }
+}
+
+fn resolve_monitor_path(path: Option<PathBuf>, project_root: &Path) -> PathBuf {
+    let path = path.unwrap_or_else(|| project_root.to_path_buf());
+    path.canonicalize().unwrap_or(path)
 }
 
 fn print_json<T: Serialize>(value: &T) {
