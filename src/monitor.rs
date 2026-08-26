@@ -27,6 +27,11 @@ const IGNORED_DIR_NAMES: &[&str] = &[
     "vendor",
 ];
 
+/// Drop a file with this name in a directory to prune it (and everything
+/// below it) from discovery — used by `skillastic register --mandatory`
+/// and `skillastic enroll` alike.
+pub const IGNORE_MARKER: &str = ".skillasticignore";
+
 /// Where a monitor registry (and its systemd unit) lives.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scope {
@@ -44,6 +49,16 @@ impl Scope {
         })
     }
 
+    /// Where the user's custom scan config lives — a small JSON file with an
+    /// `extra_roots` array of additional directories `register --mandatory`
+    /// (and `enroll`) should scan besides the home directory.
+    pub fn global_config_path(self) -> Result<PathBuf> {
+        Ok(match self {
+            Scope::User => user_config_dir()?.join("skillastic/config.json"),
+            Scope::System => PathBuf::from("/etc/skillastic/config.json"),
+        })
+    }
+
     pub fn requires_root(self) -> bool {
         matches!(self, Scope::System)
     }
@@ -56,15 +71,49 @@ impl Scope {
     }
 }
 
+/// Default directory to scan when the caller didn't name one: `$HOME` for
+/// per-user scope, or `/home` (all users) for system scope.
+pub fn default_scan_root(scope: Scope) -> Result<PathBuf> {
+    match scope {
+        Scope::User => home_dir(),
+        Scope::System => Ok(PathBuf::from("/home")),
+    }
+}
+
+pub fn home_dir() -> Result<PathBuf> {
+    std::env::var("HOME")
+        .map(PathBuf::from)
+        .map_err(|_| SkillasticError::Other("$HOME is not set".into()))
+}
+
 fn user_config_dir() -> Result<PathBuf> {
     if let Ok(dir) = std::env::var("XDG_CONFIG_HOME") {
         if !dir.is_empty() {
             return Ok(PathBuf::from(dir));
         }
     }
-    let home =
-        std::env::var("HOME").map_err(|_| SkillasticError::Other("$HOME is not set".into()))?;
-    Ok(PathBuf::from(home).join(".config"))
+    Ok(home_dir()?.join(".config"))
+}
+
+/// The user's custom scan roots, read from [`Scope::global_config_path`].
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct GlobalConfig {
+    #[serde(default)]
+    pub extra_roots: Vec<PathBuf>,
+}
+
+impl GlobalConfig {
+    pub fn load(scope: Scope) -> Result<Self> {
+        Self::load_from(&scope.global_config_path()?)
+    }
+
+    pub fn load_from(path: &Path) -> Result<Self> {
+        if !path.is_file() {
+            return Ok(Self::default());
+        }
+        let raw = fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&raw)?)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -129,6 +178,10 @@ impl MonitorRegistry {
 
     pub fn remove(&mut self, path: &Path) -> bool {
         self.projects.remove(&key_for(path)).is_some()
+    }
+
+    pub fn contains(&self, path: &Path) -> bool {
+        self.projects.contains_key(&key_for(path))
     }
 
     pub fn set_enabled(&mut self, path: &Path, enabled: bool) -> Result<()> {
