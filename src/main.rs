@@ -927,7 +927,7 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
         } => {
             let scope = if system { Scope::System } else { Scope::User };
             let roots = if roots.is_empty() {
-                vec![default_scan_root(scope)?]
+                vec![monitor::default_scan_root(scope)?]
             } else {
                 roots
             };
@@ -1077,17 +1077,6 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
 
 fn open_registry(project_root: &Path) -> Result<Registry> {
     Registry::open(project_root)
-}
-
-fn default_scan_root(scope: Scope) -> Result<PathBuf> {
-    match scope {
-        Scope::User => {
-            let home = std::env::var("HOME")
-                .map_err(|_| skillastic::SkillasticError::Other("$HOME is not set".into()))?;
-            Ok(PathBuf::from(home))
-        }
-        Scope::System => Ok(PathBuf::from("/home")),
-    }
 }
 
 fn resolve_monitor_path(path: Option<PathBuf>, project_root: &Path) -> PathBuf {
