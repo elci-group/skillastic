@@ -1108,6 +1108,13 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             dry_run,
         } => {
             let scope = if system { Scope::System } else { Scope::User };
+            // Targeted mode (no --mandatory) registers the current directory
+            // when no path is given; --mandatory decides its own roots.
+            let paths = if paths.is_empty() && !mandatory {
+                vec![project_root.to_path_buf()]
+            } else {
+                paths
+            };
             let report = register::run(register::RegisterOptions {
                 paths,
                 mandatory,
