@@ -156,8 +156,9 @@ pub struct DiscoveredRepo {
     pub has_skillastic: bool,
 }
 
-/// Finds git repos under `roots`, skipping build/dependency directories and
-/// not descending into nested repos (submodules, vendored trees).
+/// Finds git repos under `roots`, skipping build/dependency directories.
+/// Descends past repos it finds (a dotfiles-style repo at `$HOME` is common
+/// and must not swallow every project living underneath it).
 pub fn discover_repos(roots: &[PathBuf], max_depth: usize) -> Result<Vec<DiscoveredRepo>> {
     let mut found = Vec::new();
     for root in roots {
@@ -177,7 +178,8 @@ fn walk(dir: &Path, depth: usize, max_depth: usize, found: &mut Vec<DiscoveredRe
             path: dir.to_path_buf(),
             has_skillastic: dir.join(".skillastic").is_dir(),
         });
-        return; // don't descend into nested repos
+        // Keep descending: a repo (e.g. a dotfiles repo at $HOME) can still
+        // have real project repos living underneath it.
     }
     let Ok(entries) = fs::read_dir(dir) else {
         return; // unreadable (permissions, races); skip rather than fail the scan
@@ -324,14 +326,17 @@ mod tests {
     }
 
     #[test]
-    fn does_not_descend_into_nested_repos() {
+    fn descends_past_an_outer_repo_to_find_nested_ones() {
+        // A dotfiles-style repo at $HOME is common; it must not swallow the
+        // real project repos that live underneath it.
         let dir = TempDir::new().unwrap();
         make_git_repo(dir.path(), "outer", false);
         make_git_repo(dir.path(), "outer/inner", true);
 
         let found = discover_repos(&[dir.path().to_path_buf()], 6).unwrap();
-        assert_eq!(found.len(), 1);
-        assert!(found[0].path.ends_with("outer"));
+        assert_eq!(found.len(), 2);
+        assert!(found.iter().any(|r| r.path.ends_with("outer")));
+        assert!(found.iter().any(|r| r.path.ends_with("outer/inner")));
     }
 
     #[test]

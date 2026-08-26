@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::fs;
 use std::process::{Command, Output};
 use tempfile::TempDir;
 
@@ -47,9 +48,91 @@ fn help_exposes_the_core_workflow() {
         "adr",
         "docs",
         "search",
+        "enroll",
+        "monitor",
     ] {
         assert!(stdout.contains(command), "help omitted {command}");
     }
+}
+
+/// `enroll --dry-run` must never touch the real machine (no systemd units,
+/// no binary installs, no registry writes) — it only reports what it found.
+#[test]
+fn enroll_dry_run_discovers_without_installing_anything() {
+    let dir = TempDir::new().unwrap();
+    let with_workspace = dir.path().join("has-skillastic");
+    fs::create_dir_all(with_workspace.join(".git")).unwrap();
+    fs::create_dir_all(with_workspace.join(".skillastic")).unwrap();
+    let without_workspace = dir.path().join("plain-git");
+    fs::create_dir_all(without_workspace.join(".git")).unwrap();
+
+    let report = success_json(
+        &dir,
+        &[
+            "enroll",
+            "--dry-run",
+            "--root",
+            dir.path().to_str().unwrap(),
+            "--json",
+        ],
+    );
+    assert_eq!(report["dry_run"], true);
+    assert_eq!(report["scope"], "user");
+    assert!(report["binary_path"].is_null());
+    assert!(report["unit_path"].is_null());
+
+    let enrolled = report["enrolled"].as_array().unwrap();
+    assert!(enrolled.iter().any(|p| p.as_str().unwrap().ends_with("has-skillastic")));
+
+    let skipped = report["skipped_no_workspace"].as_array().unwrap();
+    assert!(skipped.iter().any(|p| p.as_str().unwrap().ends_with("plain-git")));
+    assert!(!enrolled.iter().any(|p| p.as_str().unwrap().ends_with("plain-git")));
+
+    // Dry run: no side effects anywhere, including on the discovered repo.
+    assert!(!without_workspace.join(".skillastic").exists());
+}
+
+#[test]
+fn enroll_dry_run_with_init_missing_lists_but_does_not_initialize() {
+    let dir = TempDir::new().unwrap();
+    let plain = dir.path().join("plain-git");
+    fs::create_dir_all(plain.join(".git")).unwrap();
+
+    let report = success_json(
+        &dir,
+        &[
+            "enroll",
+            "--dry-run",
+            "--init-missing",
+            "--root",
+            dir.path().to_str().unwrap(),
+            "--json",
+        ],
+    );
+    let initialized = report["initialized"].as_array().unwrap();
+    assert!(initialized.iter().any(|p| p.as_str().unwrap().ends_with("plain-git")));
+    assert!(report["skipped_no_workspace"].as_array().unwrap().is_empty());
+    // Still a dry run: nothing actually got initialized on disk.
+    assert!(!plain.join(".skillastic").exists());
+}
+
+#[test]
+fn enroll_dry_run_system_scope_works_without_root() {
+    let dir = TempDir::new().unwrap();
+    fs::create_dir_all(dir.path().join("repo/.git")).unwrap();
+
+    let report = success_json(
+        &dir,
+        &[
+            "enroll",
+            "--dry-run",
+            "--system",
+            "--root",
+            dir.path().to_str().unwrap(),
+            "--json",
+        ],
+    );
+    assert_eq!(report["scope"], "system");
 }
 
 #[test]
