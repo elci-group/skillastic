@@ -1,6 +1,6 @@
 [package]
 name = "skillastic"
-version = "0.21.34"
+version = "0.21.35"
 edition = "2024"
 rust-version = "1.85"
 description = "Adaptive skill runtime: version-aware skill lifecycle management for AI agents"
