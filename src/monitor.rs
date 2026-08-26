@@ -413,7 +413,12 @@ mod tests {
     fn global_config_round_trips_extra_roots() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("config.json");
-        assert!(GlobalConfig::load_from(&path).unwrap().extra_roots.is_empty());
+        assert!(
+            GlobalConfig::load_from(&path)
+                .unwrap()
+                .extra_roots
+                .is_empty()
+        );
 
         fs::write(
             &path,

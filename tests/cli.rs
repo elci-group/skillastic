@@ -11,6 +11,19 @@ fn skillastic(dir: &TempDir, args: &[&str]) -> Output {
         .expect("skillastic binary should run")
 }
 
+/// Like `skillastic`, but with `$HOME` (and `$XDG_CONFIG_HOME`, cleared)
+/// pointed at a sandbox dir — for commands like `register --mandatory` that
+/// otherwise default to scanning the real home directory.
+fn skillastic_with_home(dir: &TempDir, home: &std::path::Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_skillastic"))
+        .args(args)
+        .current_dir(dir.path())
+        .env("HOME", home)
+        .env_remove("XDG_CONFIG_HOME")
+        .output()
+        .expect("skillastic binary should run")
+}
+
 fn success_json(dir: &TempDir, args: &[&str]) -> Value {
     let output = skillastic(dir, args);
     assert!(
@@ -50,6 +63,7 @@ fn help_exposes_the_core_workflow() {
         "search",
         "enroll",
         "monitor",
+        "register",
     ] {
         assert!(stdout.contains(command), "help omitted {command}");
     }
@@ -154,6 +168,85 @@ fn enroll_dry_run_system_scope_works_without_root() {
         ],
     );
     assert_eq!(report["scope"], "system");
+}
+
+/// Targeted `register --dry-run` must never touch the real machine.
+#[test]
+fn register_dry_run_targets_explicit_paths() {
+    let dir = TempDir::new().unwrap();
+    let plain = dir.path().join("plain-git");
+    fs::create_dir_all(&plain).unwrap();
+
+    let report = success_json(
+        &dir,
+        &["register", plain.to_str().unwrap(), "--dry-run", "--json"],
+    );
+    assert_eq!(report["mandatory"], false);
+    let initialized = report["initialized"].as_array().unwrap();
+    assert!(
+        initialized
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("plain-git"))
+    );
+    let registered = report["registered"].as_array().unwrap();
+    assert!(
+        registered
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("plain-git"))
+    );
+    // Dry run: nothing actually got written.
+    assert!(!plain.join(".skillastic").exists());
+}
+
+#[test]
+fn register_rejects_a_path_that_is_not_a_directory() {
+    let dir = TempDir::new().unwrap();
+    let missing = dir.path().join("does-not-exist");
+
+    let output = skillastic(&dir, &["register", missing.to_str().unwrap(), "--dry-run"]);
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8(output.stderr)
+            .unwrap()
+            .contains("not a directory")
+    );
+}
+
+/// `register --mandatory --dry-run` scans the home directory like `enroll`
+/// does, and must respect a `.skillasticignore` marker. `$HOME` is pointed
+/// at a sandbox dir so this never scans the real machine's home directory.
+#[test]
+fn register_mandatory_dry_run_respects_ignore_marker() {
+    let dir = TempDir::new().unwrap();
+    let kept = dir.path().join("kept");
+    fs::create_dir_all(kept.join(".git")).unwrap();
+    let skipped = dir.path().join("skipped");
+    fs::create_dir_all(skipped.join(".git")).unwrap();
+    fs::write(skipped.join(".skillasticignore"), "").unwrap();
+
+    let output = skillastic_with_home(
+        &dir,
+        dir.path(),
+        &["register", "--mandatory", "--dry-run", "--json"],
+    );
+    assert!(
+        output.status.success(),
+        "register --mandatory failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["mandatory"], true);
+    let registered = report["registered"].as_array().unwrap();
+    assert!(
+        registered
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("kept"))
+    );
+    assert!(
+        !registered
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("skipped"))
+    );
 }
 
 #[test]

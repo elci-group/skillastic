@@ -1119,7 +1119,11 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             if json {
                 print_json(&report);
             } else {
-                let verb = if dry_run { "Would register" } else { "Registered" };
+                let verb = if dry_run {
+                    "Would register"
+                } else {
+                    "Registered"
+                };
                 println!("{verb} {} project(s).", report.registered.len());
                 if !report.initialized.is_empty() {
                     println!("Initialized new workspaces:");
