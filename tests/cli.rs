@@ -165,3 +165,134 @@ fn invalid_compatibility_range_is_rejected_without_registering_a_skill() {
         "broken skill should not be registered"
     );
 }
+
+#[test]
+fn setup_creates_agent_docs() {
+    let dir = TempDir::new().unwrap();
+    success_json(&dir, &["init", "--app-version", "1.0.0", "--json"]);
+
+    let output = skillastic(&dir, &["setup", "--non-interactive"]);
+    assert!(output.status.success());
+
+    assert!(
+        dir.path()
+            .join(".skillastic/agents/issue-tracker.md")
+            .is_file()
+    );
+    assert!(
+        dir.path()
+            .join(".skillastic/agents/triage-labels.md")
+            .is_file()
+    );
+    assert!(dir.path().join(".skillastic/agents/domain.md").is_file());
+}
+
+#[test]
+fn doctor_reports_workspace_health() {
+    let dir = TempDir::new().unwrap();
+    success_json(&dir, &["init", "--app-version", "1.0.0", "--json"]);
+
+    // Before setup, doctor reports missing agent docs.
+    let output = skillastic(&dir, &["doctor"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("Workspace issues"));
+    assert!(stdout.contains("missing setup file"));
+
+    // After setup, the workspace is healthy.
+    skillastic(&dir, &["setup", "--non-interactive"]);
+    let output = skillastic(&dir, &["doctor"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("Workspace is healthy"));
+}
+
+#[test]
+fn add_with_template_seeds_workflow_skill() {
+    let dir = TempDir::new().unwrap();
+    success_json(&dir, &["init", "--app-version", "1.0.0", "--json"]);
+
+    let added = success_json(
+        &dir,
+        &[
+            "add",
+            "tdd",
+            "--version",
+            "1.0.0",
+            "--compatible",
+            ">=1.0.0",
+            "--template",
+            "tdd",
+            "--invocation",
+            "model",
+            "--bucket",
+            "engineering",
+            "--app-version",
+            "1.0.0",
+            "--json",
+        ],
+    );
+    assert_eq!(added["name"], "tdd");
+    assert_eq!(added["bucket"], "engineering");
+    assert_eq!(added["invocation"], "model_invoked");
+
+    let listed = success_json(&dir, &["list", "--json"]);
+    let tdd = listed
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["name"] == "tdd")
+        .expect("tdd skill should be listed");
+    assert_eq!(tdd["bucket"], "engineering");
+}
+
+#[test]
+fn domain_model_and_adr_create_files() {
+    let dir = TempDir::new().unwrap();
+    success_json(&dir, &["init", "--app-version", "1.0.0", "--json"]);
+
+    let output = skillastic(&dir, &["domain-model"]);
+    assert!(output.status.success());
+    assert!(dir.path().join("CONTEXT.md").is_file());
+
+    let output = skillastic(&dir, &["adr", "Use immutable snapshots"]);
+    assert!(output.status.success());
+    let adr_path = dir
+        .path()
+        .join(".skillastic/adr/0001-use-immutable-snapshots.md");
+    assert!(adr_path.is_file());
+}
+
+#[test]
+fn docs_generate_and_search_work() {
+    let dir = TempDir::new().unwrap();
+    success_json(&dir, &["init", "--app-version", "1.0.0", "--json"]);
+
+    let output = skillastic(&dir, &["docs", "generate", "ask-skillastic"]);
+    assert!(output.status.success());
+    assert!(
+        dir.path()
+            .join(".skillastic/docs/ask-skillastic.md")
+            .is_file()
+    );
+
+    let output = skillastic(&dir, &["search", "command"]);
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("ask-skillastic"));
+}
+
+#[test]
+fn promoted_command_validates_seeded_skill() {
+    let dir = TempDir::new().unwrap();
+    success_json(&dir, &["init", "--app-version", "1.0.0", "--json"]);
+
+    let promoted = success_json(&dir, &["promoted", "--json"]);
+    assert!(
+        promoted["skills"]
+            .as_array()
+            .unwrap()
+            .contains(&"ask-skillastic".into())
+    );
+    assert!(promoted["missing"].as_array().unwrap().is_empty());
+}

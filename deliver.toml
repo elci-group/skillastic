@@ -2,7 +2,7 @@
 path = "README.md"
 required = true
 min_size_bytes = 1000
-require_regex = ["Quick start", "Development", "MIT License"]
+require_regex = ["Main flow", "Development", "MIT License"]
 
 [[file]]
 path = "LICENSE"
