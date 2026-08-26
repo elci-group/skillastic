@@ -270,6 +270,32 @@ enum Command {
         #[command(subcommand)]
         action: MonitorAction,
     },
+
+    /// Create (or reuse) a .skillastic workspace for one or more projects
+    /// and index them for daemon monitoring.
+    Register {
+        /// Project directories to register (defaults to the current
+        /// directory). With --mandatory, treated as extra scan roots.
+        paths: Vec<PathBuf>,
+        /// Recursively scan the home directory (or /home for --system) plus
+        /// the roots in the user's global config
+        /// (~/.config/skillastic/config.json), registering every project
+        /// found. Opt a directory out with a .skillasticignore file in it.
+        #[arg(long)]
+        mandatory: bool,
+        /// Index into the system-wide registry instead of the per-user one.
+        #[arg(long)]
+        system: bool,
+        /// Poll interval for each registered daemon, in seconds.
+        #[arg(long, default_value_t = 300)]
+        interval: u64,
+        /// Max directory depth to scan below each root (--mandatory only).
+        #[arg(long, default_value_t = 6)]
+        max_depth: usize,
+        /// Report what would happen without writing or starting anything.
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand)]
@@ -1070,6 +1096,43 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 println!("No skills matched '{query}'.");
             } else {
                 print!("{}", search::hits_to_table(&hits));
+            }
+        }
+
+        Command::Register {
+            paths,
+            mandatory,
+            system,
+            interval,
+            max_depth,
+            dry_run,
+        } => {
+            let scope = if system { Scope::System } else { Scope::User };
+            let report = register::run(register::RegisterOptions {
+                paths,
+                mandatory,
+                scope,
+                interval,
+                max_depth,
+                dry_run,
+            })?;
+            if json {
+                print_json(&report);
+            } else {
+                let verb = if dry_run { "Would register" } else { "Registered" };
+                println!("{verb} {} project(s).", report.registered.len());
+                if !report.initialized.is_empty() {
+                    println!("Initialized new workspaces:");
+                    for p in &report.initialized {
+                        println!("  - {p}");
+                    }
+                }
+                if !report.already_indexed.is_empty() {
+                    println!("Already indexed (interval refreshed):");
+                    for p in &report.already_indexed {
+                        println!("  - {p}");
+                    }
+                }
             }
         }
     }
