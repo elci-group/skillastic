@@ -198,6 +198,24 @@ fn register_dry_run_targets_explicit_paths() {
     assert!(!plain.join(".skillastic").exists());
 }
 
+/// With no path argument (and no --mandatory), register targets the
+/// current directory — the CLI's `dir` here, since commands run with
+/// `current_dir(dir.path())`.
+#[test]
+fn register_defaults_to_the_current_directory_when_no_path_is_given() {
+    let dir = TempDir::new().unwrap();
+
+    let report = success_json(&dir, &["register", "--dry-run", "--json"]);
+    assert_eq!(report["mandatory"], false);
+    let cwd = dir.path().canonicalize().unwrap();
+    let cwd = cwd.to_str().unwrap();
+    let registered = report["registered"].as_array().unwrap();
+    assert_eq!(registered.len(), 1);
+    assert_eq!(registered[0].as_str().unwrap(), cwd);
+    let initialized = report["initialized"].as_array().unwrap();
+    assert_eq!(initialized[0].as_str().unwrap(), cwd);
+}
+
 #[test]
 fn register_rejects_a_path_that_is_not_a_directory() {
     let dir = TempDir::new().unwrap();
