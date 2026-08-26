@@ -263,21 +263,20 @@ pub fn running_daemon_pid(path: &Path) -> Option<u32> {
 }
 
 fn spawn_daemon(path: &Path, interval: u64) -> Result<u32> {
-    spawn_daemon_with(&std::env::current_exe()?, path, interval)
+    let exe = std::env::current_exe()?;
+    spawn_detached(&exe, &["daemon", "--interval", &interval.to_string()], path)
 }
 
-/// Spawns `exe daemon --interval <interval>` detached, in `path`, recording
-/// its pid. Split out from [`spawn_daemon`] so tests can point `exe` at a
-/// harmless stand-in instead of re-invoking the real daemon loop.
-fn spawn_daemon_with(exe: &Path, path: &Path, interval: u64) -> Result<u32> {
+/// Spawns `exe args...` detached, in `path`, recording its pid. Args are
+/// passed through generically so tests can point `exe` at a harmless
+/// stand-in (e.g. `/bin/sleep`) instead of re-invoking the real daemon loop.
+fn spawn_detached(exe: &Path, args: &[&str], path: &Path) -> Result<u32> {
     let skillastic_dir = path.join(".skillastic");
     fs::create_dir_all(&skillastic_dir)?;
     let out = fs::File::create(skillastic_dir.join("daemon.out"))?;
     let err = fs::File::create(skillastic_dir.join("daemon.err"))?;
     let child = Command::new(exe)
-        .arg("daemon")
-        .arg("--interval")
-        .arg(interval.to_string())
+        .args(args)
         .current_dir(path)
         .stdin(Stdio::null())
         .stdout(out)
@@ -381,7 +380,7 @@ mod tests {
         fs::create_dir_all(&proj).unwrap();
         // Stand in for the real binary with something that just sleeps, so
         // this test never runs actual daemon logic.
-        let pid = spawn_daemon_with(Path::new("/bin/sleep"), &proj, 30).unwrap();
+        let pid = spawn_detached(Path::new("/bin/sleep"), &["30"], &proj).unwrap();
         assert!(running_daemon_pid(&proj).is_some());
         // Clean up: don't leave a sleeping process behind.
         let _ = Command::new("kill").arg(pid.to_string()).status();
