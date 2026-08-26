@@ -1022,7 +1022,9 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                     if json {
                         print_json(&registry);
                     } else if registry.projects.is_empty() {
-                        println!("No projects registered. Use `skillastic enroll` or `skillastic monitor add`.");
+                        println!(
+                            "No projects registered. Use `skillastic enroll` or `skillastic monitor add`."
+                        );
                     } else {
                         let rows = registry
                             .projects
@@ -1031,17 +1033,18 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                                 let pid = monitor::running_daemon_pid(&p.path);
                                 vec![
                                     p.path.display().to_string(),
-                                    if p.enabled { "enabled".into() } else { "disabled".into() },
+                                    if p.enabled {
+                                        "enabled".into()
+                                    } else {
+                                        "disabled".into()
+                                    },
                                     p.interval.to_string(),
                                     pid.map(|id| format!("running ({id})"))
                                         .unwrap_or_else(|| "stopped".into()),
                                 ]
                             })
                             .collect();
-                        print!(
-                            "{}",
-                            table(&["PATH", "STATE", "INTERVAL", "DAEMON"], rows)
-                        );
+                        print!("{}", table(&["PATH", "STATE", "INTERVAL", "DAEMON"], rows));
                     }
                 }
                 MonitorAction::Resume => {

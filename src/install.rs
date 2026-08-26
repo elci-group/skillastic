@@ -35,7 +35,9 @@ pub fn ensure_binary_installed(scope: Scope) -> Result<PathBuf> {
 
 fn install_binary_at(current: &Path, target_dir: &Path) -> Result<PathBuf> {
     let target = target_dir.join("skillastic");
-    let current_canon = current.canonicalize().unwrap_or_else(|_| current.to_path_buf());
+    let current_canon = current
+        .canonicalize()
+        .unwrap_or_else(|_| current.to_path_buf());
     let target_canon = target.canonicalize().unwrap_or_else(|_| target.clone());
     if current_canon == target_canon {
         return Ok(target);

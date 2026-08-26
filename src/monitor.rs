@@ -375,7 +375,11 @@ mod tests {
     fn set_enabled_on_unknown_path_errors() {
         let dir = TempDir::new().unwrap();
         let mut registry = MonitorRegistry::default();
-        assert!(registry.set_enabled(&dir.path().join("nope"), true).is_err());
+        assert!(
+            registry
+                .set_enabled(&dir.path().join("nope"), true)
+                .is_err()
+        );
     }
 
     #[test]

@@ -82,11 +82,23 @@ fn enroll_dry_run_discovers_without_installing_anything() {
     assert!(report["unit_path"].is_null());
 
     let enrolled = report["enrolled"].as_array().unwrap();
-    assert!(enrolled.iter().any(|p| p.as_str().unwrap().ends_with("has-skillastic")));
+    assert!(
+        enrolled
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("has-skillastic"))
+    );
 
     let skipped = report["skipped_no_workspace"].as_array().unwrap();
-    assert!(skipped.iter().any(|p| p.as_str().unwrap().ends_with("plain-git")));
-    assert!(!enrolled.iter().any(|p| p.as_str().unwrap().ends_with("plain-git")));
+    assert!(
+        skipped
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("plain-git"))
+    );
+    assert!(
+        !enrolled
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("plain-git"))
+    );
 
     // Dry run: no side effects anywhere, including on the discovered repo.
     assert!(!without_workspace.join(".skillastic").exists());
@@ -110,8 +122,17 @@ fn enroll_dry_run_with_init_missing_lists_but_does_not_initialize() {
         ],
     );
     let initialized = report["initialized"].as_array().unwrap();
-    assert!(initialized.iter().any(|p| p.as_str().unwrap().ends_with("plain-git")));
-    assert!(report["skipped_no_workspace"].as_array().unwrap().is_empty());
+    assert!(
+        initialized
+            .iter()
+            .any(|p| p.as_str().unwrap().ends_with("plain-git"))
+    );
+    assert!(
+        report["skipped_no_workspace"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
     // Still a dry run: nothing actually got initialized on disk.
     assert!(!plain.join(".skillastic").exists());
 }
