@@ -397,6 +397,37 @@ mod tests {
     }
 
     #[test]
+    fn ignore_marker_prunes_a_directory_and_everything_below_it() {
+        let dir = TempDir::new().unwrap();
+        make_git_repo(dir.path(), "kept", false);
+        make_git_repo(dir.path(), "skipped", false);
+        make_git_repo(dir.path(), "skipped/nested", true);
+        fs::write(dir.path().join("skipped").join(IGNORE_MARKER), "").unwrap();
+
+        let found = discover_repos(&[dir.path().to_path_buf()], 6).unwrap();
+        assert_eq!(found.len(), 1);
+        assert!(found[0].path.ends_with("kept"));
+    }
+
+    #[test]
+    fn global_config_round_trips_extra_roots() {
+        let dir = TempDir::new().unwrap();
+        let path = dir.path().join("config.json");
+        assert!(GlobalConfig::load_from(&path).unwrap().extra_roots.is_empty());
+
+        fs::write(
+            &path,
+            serde_json::json!({ "extra_roots": ["/srv/projects", "/opt/work"] }).to_string(),
+        )
+        .unwrap();
+        let loaded = GlobalConfig::load_from(&path).unwrap();
+        assert_eq!(
+            loaded.extra_roots,
+            vec![PathBuf::from("/srv/projects"), PathBuf::from("/opt/work")]
+        );
+    }
+
+    #[test]
     fn registry_round_trips_through_disk() {
         let dir = TempDir::new().unwrap();
         let path = dir.path().join("monitored.json");
@@ -420,12 +451,14 @@ mod tests {
         fs::create_dir_all(&proj).unwrap();
         let mut registry = MonitorRegistry::default();
         registry.upsert(&proj, 60);
+        assert!(registry.contains(&proj));
 
         registry.set_enabled(&proj, false).unwrap();
         assert!(!registry.projects.values().next().unwrap().enabled);
 
         assert!(registry.remove(&proj));
         assert!(registry.projects.is_empty());
+        assert!(!registry.contains(&proj));
     }
 
     #[test]
