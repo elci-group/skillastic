@@ -5,3 +5,7 @@ __pycache__/
 .venv/
 bench/results/*
 !bench/results/.gitignore
+
+# kaptaind / build
+ /.kaptaind/
+ /target/
