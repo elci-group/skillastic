@@ -521,4 +521,63 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    def __curly_original_entry():
+        sys.exit(main())
+    import sys
+    import subprocess
+    from curly_expand import expand_or_literal, cartesian
+
+    _raw_argv = sys.argv[:]
+    _positions = []
+    _fields = []
+    for _i, _a in enumerate(_raw_argv):
+        if _a == "--agents" and _i + 1 < len(_raw_argv):
+            _positions.append(_i + 1)
+            _fields.append(expand_or_literal(_raw_argv[_i + 1]))
+            break
+        if _a.startswith("--agents="):
+            _positions.append(_i)
+            _fields.append(["--agents=" + v for v in expand_or_literal(_a.split("=", 1)[1])])
+            break
+    for _i, _a in enumerate(_raw_argv):
+        if _a == "--tasks" and _i + 1 < len(_raw_argv):
+            _positions.append(_i + 1)
+            _fields.append(expand_or_literal(_raw_argv[_i + 1]))
+            break
+        if _a.startswith("--tasks="):
+            _positions.append(_i)
+            _fields.append(["--tasks=" + v for v in expand_or_literal(_a.split("=", 1)[1])])
+            break
+    for _i, _a in enumerate(_raw_argv):
+        if _a == "--arms" and _i + 1 < len(_raw_argv):
+            _positions.append(_i + 1)
+            _fields.append(expand_or_literal(_raw_argv[_i + 1]))
+            break
+        if _a.startswith("--arms="):
+            _positions.append(_i)
+            _fields.append(["--arms=" + v for v in expand_or_literal(_a.split("=", 1)[1])])
+            break
+    for _i, _a in enumerate(_raw_argv):
+        if _a == "--out" and _i + 1 < len(_raw_argv):
+            _positions.append(_i + 1)
+            _fields.append(expand_or_literal(_raw_argv[_i + 1]))
+            break
+        if _a.startswith("--out="):
+            _positions.append(_i)
+            _fields.append(["--out=" + v for v in expand_or_literal(_a.split("=", 1)[1])])
+            break
+
+    if not _fields or all(len(f) <= 1 for f in _fields):
+        __curly_original_entry()
+    else:
+        _combos = cartesian(_fields)
+        _failed = False
+        for _combo in _combos:
+            _new_argv = list(_raw_argv)
+            for _pos, _val in zip(_positions, _combo):
+                _new_argv[_pos] = _val
+            _r = subprocess.run([sys.executable] + _new_argv)
+            if _r.returncode != 0:
+                _failed = True
+        if _failed:
+            sys.exit(1)
