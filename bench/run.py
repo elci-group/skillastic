@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import copy
+from curly_expand import expand_or_literal
 """bench/run.py — multi-agent benchmark runner (agents x tasks x arms).
 
 Runs coding agents against task fixtures, captures tool-use and efficiency
@@ -429,95 +431,108 @@ def main() -> int:
                     help="enable hidden debug agents (debug-echo)")
     args = ap.parse_args()
 
-    registry = dict(AGENTS)
-    if args.include_debug:
-        registry.update(DEBUG_AGENTS)
+    __curly_agents = expand_or_literal(args.agents) if args.agents is not None else [None]
+    __curly_tasks = expand_or_literal(args.tasks) if args.tasks is not None else [None]
+    __curly_arms = expand_or_literal(args.arms) if args.arms is not None else [None]
+    __curly_out = expand_or_literal(args.out) if args.out is not None else [None]
+    for __curly_v_agents in __curly_agents:
+        for __curly_v_tasks in __curly_tasks:
+            for __curly_v_arms in __curly_arms:
+                for __curly_v_out in __curly_out:
+                    args = copy.copy(args)
+                    args.agents = __curly_v_agents
+                    args.tasks = __curly_v_tasks
+                    args.arms = __curly_v_arms
+                    args.out = __curly_v_out
+                    registry = dict(AGENTS)
+                    if args.include_debug:
+                        registry.update(DEBUG_AGENTS)
 
-    if args.agents:
-        agent_names = [a.strip() for a in args.agents.split(",") if a.strip()]
-        for a in agent_names:
-            if a not in registry:
-                if a in DEBUG_AGENTS:
-                    raise SystemExit(f"error: agent {a!r} requires --include-debug")
-                raise SystemExit(f"error: unknown agent {a!r}; known: {', '.join(registry)}")
-    else:
-        agent_names = list(AGENTS)
+                    if args.agents:
+                        agent_names = [a.strip() for a in args.agents.split(",") if a.strip()]
+                        for a in agent_names:
+                            if a not in registry:
+                                if a in DEBUG_AGENTS:
+                                    raise SystemExit(f"error: agent {a!r} requires --include-debug")
+                                raise SystemExit(f"error: unknown agent {a!r}; known: {', '.join(registry)}")
+                    else:
+                        agent_names = list(AGENTS)
 
-    task_dirs = ([resolve_task(t.strip()) for t in args.tasks.split(",") if t.strip()]
-                 if args.tasks else discover_tasks())
+                    task_dirs = ([resolve_task(t.strip()) for t in args.tasks.split(",") if t.strip()]
+                                 if args.tasks else discover_tasks())
 
-    arms = ([a.strip() for a in args.arms.split(",") if a.strip()]
-            if args.arms else list(ARMS))
-    for a in arms:
-        if a not in ARMS:
-            raise SystemExit(f"error: unknown arm {a!r}; known: {', '.join(ARMS)}")
+                    arms = ([a.strip() for a in args.arms.split(",") if a.strip()]
+                            if args.arms else list(ARMS))
+                    for a in arms:
+                        if a not in ARMS:
+                            raise SystemExit(f"error: unknown arm {a!r}; known: {', '.join(ARMS)}")
 
-    if args.list:
-        print(f"agents ({len(agent_names)}):")
-        for a in agent_names:
-            info = registry[a]
-            print(f"  {a}  harness={info['harness']} model={info['model'] or '-'}")
-        print(f"tasks ({len(task_dirs)}):")
-        for t in task_dirs:
-            print(f"  {t.name}  ({t})")
-        print(f"arms ({len(arms)}): {', '.join(arms)}")
-        print(f"matrix: {len(agent_names)} agents x {len(task_dirs)} tasks x "
-              f"{len(arms)} arms = {len(agent_names) * len(task_dirs) * len(arms)} runs")
-        for a in agent_names:
-            for t in task_dirs:
-                for arm in arms:
-                    print(f"  {a} x {t.name} x {arm}")
-        return 0
+                    if args.list:
+                        print(f"agents ({len(agent_names)}):")
+                        for a in agent_names:
+                            info = registry[a]
+                            print(f"  {a}  harness={info['harness']} model={info['model'] or '-'}")
+                        print(f"tasks ({len(task_dirs)}):")
+                        for t in task_dirs:
+                            print(f"  {t.name}  ({t})")
+                        print(f"arms ({len(arms)}): {', '.join(arms)}")
+                        print(f"matrix: {len(agent_names)} agents x {len(task_dirs)} tasks x "
+                              f"{len(arms)} arms = {len(agent_names) * len(task_dirs) * len(arms)} runs")
+                        for a in agent_names:
+                            for t in task_dirs:
+                                for arm in arms:
+                                    print(f"  {a} x {t.name} x {arm}")
+                        return 0
 
-    if not task_dirs:
-        raise SystemExit(f"error: no task fixtures found under {FIXTURES_DIR}")
-    if any(registry[a]["harness"] == "kimi" for a in agent_names) and not KIMI_HOME.is_dir():
-        raise SystemExit(f"error: KIMI_CODE_HOME={KIMI_HOME} does not exist; "
-                         "create it before running kimi agents")
+                    if not task_dirs:
+                        raise SystemExit(f"error: no task fixtures found under {FIXTURES_DIR}")
+                    if any(registry[a]["harness"] == "kimi" for a in agent_names) and not KIMI_HOME.is_dir():
+                        raise SystemExit(f"error: KIMI_CODE_HOME={KIMI_HOME} does not exist; "
+                                         "create it before running kimi agents")
 
-    out_dir = (Path(args.out) if args.out
-               else RESULTS_ROOT / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
-    out_dir = out_dir.resolve()
-    (out_dir / "logs").mkdir(parents=True, exist_ok=True)
-    (out_dir / "ws").mkdir(parents=True, exist_ok=True)
-    runs_path = out_dir / "runs.jsonl"
+                    out_dir = (Path(args.out) if args.out
+                               else RESULTS_ROOT / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"))
+                    out_dir = out_dir.resolve()
+                    (out_dir / "logs").mkdir(parents=True, exist_ok=True)
+                    (out_dir / "ws").mkdir(parents=True, exist_ok=True)
+                    runs_path = out_dir / "runs.jsonl"
 
-    jobs = [(a, registry[a], t, t.name, arm)
-            for a in agent_names for t in task_dirs for arm in arms]
-    total = len(jobs)
-    print(f"bench: {total} runs, workers={args.workers}, timeout={args.timeout}s, out={out_dir}",
-          flush=True)
+                    jobs = [(a, registry[a], t, t.name, arm)
+                            for a in agent_names for t in task_dirs for arm in arms]
+                    total = len(jobs)
+                    print(f"bench: {total} runs, workers={args.workers}, timeout={args.timeout}s, out={out_dir}",
+                          flush=True)
 
-    done = 0
-    with ThreadPoolExecutor(max_workers=args.workers) as ex, open(runs_path, "a") as runs_f:
-        futures = {ex.submit(run_one, a, info, t, tname, arm, out_dir, args.timeout):
-                   (a, tname, arm) for a, info, t, tname, arm in jobs}
-        for fut in as_completed(futures):
-            a, tname, arm = futures[fut]
-            try:
-                rec = fut.result()
-            except Exception as e:  # belt-and-braces; run_one already guards
-                rec = {"agent": a, "harness": registry[a]["harness"],
-                       "model": registry[a]["model"], "task": tname, "arm": arm,
-                       "workspace": None, "started_at": datetime.now(timezone.utc).isoformat(),
-                       "duration_s": None, "exit_code": None, "timed_out": False,
-                       "tests_passed": 0, "tests_total": 0, "grader_details": [],
-                       "forbidden_edits": [], "checks": {}, "tool_calls_total": None,
-                       "tool_calls": {}, "tool_errors": None, "tokens_in": None,
-                       "tokens_out": None, "error": f"{type(e).__name__}: {e}"}
-            runs_f.write(json.dumps(rec) + "\n")
-            runs_f.flush()
-            done += 1
-            status = (f"exit={rec['exit_code']} passed={rec['tests_passed']}/"
-                      f"{rec['tests_total']} dur={rec['duration_s']}s")
-            if rec["timed_out"]:
-                status += " TIMED_OUT"
-            if rec["error"]:
-                status += f" error={rec['error']}"
-            print(f"[{done}/{total}] {a} x {tname} x {arm}: {status}", flush=True)
+                    done = 0
+                    with ThreadPoolExecutor(max_workers=args.workers) as ex, open(runs_path, "a") as runs_f:
+                        futures = {ex.submit(run_one, a, info, t, tname, arm, out_dir, args.timeout):
+                                   (a, tname, arm) for a, info, t, tname, arm in jobs}
+                        for fut in as_completed(futures):
+                            a, tname, arm = futures[fut]
+                            try:
+                                rec = fut.result()
+                            except Exception as e:  # belt-and-braces; run_one already guards
+                                rec = {"agent": a, "harness": registry[a]["harness"],
+                                       "model": registry[a]["model"], "task": tname, "arm": arm,
+                                       "workspace": None, "started_at": datetime.now(timezone.utc).isoformat(),
+                                       "duration_s": None, "exit_code": None, "timed_out": False,
+                                       "tests_passed": 0, "tests_total": 0, "grader_details": [],
+                                       "forbidden_edits": [], "checks": {}, "tool_calls_total": None,
+                                       "tool_calls": {}, "tool_errors": None, "tokens_in": None,
+                                       "tokens_out": None, "error": f"{type(e).__name__}: {e}"}
+                            runs_f.write(json.dumps(rec) + "\n")
+                            runs_f.flush()
+                            done += 1
+                            status = (f"exit={rec['exit_code']} passed={rec['tests_passed']}/"
+                                      f"{rec['tests_total']} dur={rec['duration_s']}s")
+                            if rec["timed_out"]:
+                                status += " TIMED_OUT"
+                            if rec["error"]:
+                                status += f" error={rec['error']}"
+                            print(f"[{done}/{total}] {a} x {tname} x {arm}: {status}", flush=True)
 
-    print(f"done: {total} runs -> {runs_path}", flush=True)
-    return 0
+                    print(f"done: {total} runs -> {runs_path}", flush=True)
+                    return 0
 
 
 if __name__ == "__main__":
