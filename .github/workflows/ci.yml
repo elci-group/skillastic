@@ -60,7 +60,7 @@ jobs:
           persist-credentials: false
 
       - name: Install minimum supported Rust
-        uses: dtolnay/rust-toolchain@1.85.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Check all targets
         run: cargo check --locked --all-targets --all-features
