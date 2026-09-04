@@ -1,0 +1,52 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic add" 1  "skillastic add " 
+.SH NAME
+skillastic add \- Register a new skill
+.SH SYNOPSIS
+\fBskillastic add\fR <\fB\-\-version\fR> <\fB\-\-compatible\fR> [\fB\-\-body\fR] [\fB\-\-template\fR] [\fB\-\-verify\fR] [\fB\-\-bucket\fR] [\fB\-\-invocation\fR] [\fB\-\-requires\fR] [\fB\-h\fR|\fB\-\-help\fR] <\fINAME\fR> 
+.SH DESCRIPTION
+Register a new skill
+.SH OPTIONS
+.TP
+\fB\-\-version\fR \fI<VERSION>\fR
+Initial skill version
+.TP
+\fB\-\-compatible\fR \fI<COMPATIBLE>\fR
+Compatible app range(s), e.g. ">=2.1.0, <3.0.0". Repeatable
+.TP
+\fB\-\-body\fR \fI<BODY>\fR
+Markdown file with the skill\*(Aqs instruction body
+.TP
+\fB\-\-template\fR \fI<TEMPLATE>\fR
+Built\-in skill template to use as the body
+.TP
+\fB\-\-verify\fR
+Mark the skill verified against the current app version
+.TP
+\fB\-\-bucket\fR \fI<BUCKET>\fR [default: core]
+Bucket for the skill
+.TP
+\fB\-\-invocation\fR \fI<INVOCATION>\fR [default: both]
+Who can invoke the skill
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+user
+.IP \(bu 2
+model
+.IP \(bu 2
+both
+.RE
+.TP
+\fB\-\-requires\fR \fI<REQUIRES>\fR
+Other skills this skill requires. Repeatable
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+<\fINAME\fR>
+Skill name, e.g. "frontend\-react"

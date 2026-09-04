@@ -1,0 +1,31 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic register" 1  "skillastic register " 
+.SH NAME
+skillastic register \- Create (or reuse) a .skillastic workspace for one or more projects and index them for daemon monitoring
+.SH SYNOPSIS
+\fBskillastic register\fR [\fB\-\-mandatory\fR] [\fB\-\-system\fR] [\fB\-\-interval\fR] [\fB\-\-max\-depth\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fIPATHS\fR] 
+.SH DESCRIPTION
+Create (or reuse) a .skillastic workspace for one or more projects and index them for daemon monitoring
+.SH OPTIONS
+.TP
+\fB\-\-mandatory\fR
+Recursively scan the home directory (or /home for \-\-system) plus the roots in the user\*(Aqs global config (~/.config/skillastic/config.json), registering every project found. Opt a directory out with a .skillasticignore file in it
+.TP
+\fB\-\-system\fR
+Index into the system\-wide registry instead of the per\-user one
+.TP
+\fB\-\-interval\fR \fI<INTERVAL>\fR [default: 300]
+Poll interval for each registered daemon, in seconds
+.TP
+\fB\-\-max\-depth\fR \fI<MAX_DEPTH>\fR [default: 6]
+Max directory depth to scan below each root (\-\-mandatory only)
+.TP
+\fB\-\-dry\-run\fR
+Report what would happen without writing or starting anything
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+[\fIPATHS\fR]
+Project directories to register (defaults to the current directory). With \-\-mandatory, treated as extra scan roots

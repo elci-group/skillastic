@@ -22,6 +22,23 @@ cargo install --path .
 skillastic --version
 ```
 
+### Man pages
+
+Manual pages for every command and subcommand live in `man/` (e.g.
+`man/skillastic-add.1`, `man/skillastic-monitor-add.1`). Install them with:
+
+```sh
+sudo cp man/*.1 /usr/local/share/man/man1/
+```
+
+Then view with `man skillastic` or `man skillastic-monitor-add`. The pages
+are generated from the clap definitions in `src/main.rs` — regenerate them
+after changing the CLI with:
+
+```sh
+cargo run --example gen-man
+```
+
 ## Main flow
 
 Run these commands in the application whose skills you want to maintain:

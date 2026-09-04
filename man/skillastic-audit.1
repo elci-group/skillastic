@@ -1,0 +1,25 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic audit" 1  "skillastic audit " 
+.SH NAME
+skillastic audit \- Audit project roots for missing or incomplete .skillastic workspaces
+.SH SYNOPSIS
+\fBskillastic audit\fR [\fB\-\-root\fR] [\fB\-\-source\fR] [\fB\-\-infer\fR] [\fB\-\-model\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Audit project roots for missing or incomplete .skillastic workspaces
+.SH OPTIONS
+.TP
+\fB\-\-root\fR \fI<ROOT>\fR [default: .]
+Directory to scan (defaults to the current directory)
+.TP
+\fB\-\-source\fR \fI<SOURCES>\fR
+Additional project\-source directory; repeat for multiple sources
+.TP
+\fB\-\-infer\fR
+Ask Groq to prioritize deterministic findings using bound context
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR [default: llama\-3.1\-8b\-instant]
+Groq model used for advisory prioritization
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help

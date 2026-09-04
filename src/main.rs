@@ -31,7 +31,7 @@ use std::process::ExitCode;
 /// and skill migration with lineage.
 #[derive(Parser)]
 #[command(name = "skillastic", version, about)]
-struct Cli {
+pub struct Cli {
     /// Emit machine-readable JSON.
     #[arg(long, global = true)]
     json: bool,
@@ -45,7 +45,7 @@ struct Cli {
 }
 
 #[derive(Clone, ValueEnum)]
-enum InvocationArg {
+pub enum InvocationArg {
     User,
     Model,
     Both,
@@ -62,7 +62,7 @@ impl From<InvocationArg> for SkillInvocation {
 }
 
 #[derive(Subcommand)]
-enum Command {
+pub enum Command {
     /// Initialize a .skillastic workspace in the current project.
     Init {
         /// Application name (defaults to the directory name).
@@ -299,7 +299,7 @@ enum Command {
 }
 
 #[derive(Subcommand)]
-enum MonitorAction {
+pub enum MonitorAction {
     /// Register a project for monitoring (defaults to the current directory).
     Add {
         path: Option<PathBuf>,
@@ -320,7 +320,7 @@ enum MonitorAction {
 }
 
 #[derive(Subcommand)]
-enum DocsAction {
+pub enum DocsAction {
     /// Generate a docs page for a skill.
     Generate {
         /// Skill name.

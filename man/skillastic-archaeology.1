@@ -1,0 +1,19 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic archaeology" 1  "skillastic archaeology " 
+.SH NAME
+skillastic archaeology \- Commit\-chain analysis between two app versions
+.SH SYNOPSIS
+\fBskillastic archaeology\fR [\fB\-\-from\fR] [\fB\-\-to\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Commit\-chain analysis between two app versions
+.SH OPTIONS
+.TP
+\fB\-\-from\fR \fI<FROM>\fR
+Start version/ref (default: tag before \-\-to)
+.TP
+\fB\-\-to\fR \fI<TO>\fR
+End version/ref (default: HEAD)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help

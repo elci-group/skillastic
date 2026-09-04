@@ -1,0 +1,16 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic daemon" 1  "skillastic daemon " 
+.SH NAME
+skillastic daemon \- Run the skillastic daemon (poll for app changes, auto\-resolve/migrate)
+.SH SYNOPSIS
+\fBskillastic daemon\fR [\fB\-\-interval\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Run the skillastic daemon (poll for app changes, auto\-resolve/migrate)
+.SH OPTIONS
+.TP
+\fB\-\-interval\fR \fI<INTERVAL>\fR [default: 60]
+Poll interval in seconds
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help

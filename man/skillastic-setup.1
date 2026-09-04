@@ -1,0 +1,19 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic setup" 1  "skillastic setup " 
+.SH NAME
+skillastic setup \- Configure this repo for the Skillastic skills (issue tracker, triage labels, domain docs)
+.SH SYNOPSIS
+\fBskillastic setup\fR [\fB\-\-non\-interactive\fR] [\fB\-\-issue\-tracker\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Configure this repo for the Skillastic skills (issue tracker, triage labels, domain docs)
+.SH OPTIONS
+.TP
+\fB\-\-non\-interactive\fR
+Skip interactive prompts and use defaults
+.TP
+\fB\-\-issue\-tracker\fR \fI<ISSUE_TRACKER>\fR
+Issue tracker provider when using \-\-non\-interactive
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help

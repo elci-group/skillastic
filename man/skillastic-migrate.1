@@ -1,0 +1,22 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic migrate" 1  "skillastic migrate " 
+.SH NAME
+skillastic migrate \- Migrate a skill (or \-\-all) to the current app version
+.SH SYNOPSIS
+\fBskillastic migrate\fR [\fB\-\-all\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fINAME\fR] 
+.SH DESCRIPTION
+Migrate a skill (or \-\-all) to the current app version
+.SH OPTIONS
+.TP
+\fB\-\-all\fR
+Migrate every skill the resolver marks `migrate`
+.TP
+\fB\-\-dry\-run\fR
+Compute and print the delta without writing anything
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+[\fINAME\fR]
+Skill name; omit with \-\-all

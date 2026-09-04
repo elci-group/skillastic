@@ -1,0 +1,19 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic init" 1  "skillastic init " 
+.SH NAME
+skillastic init \- Initialize a .skillastic workspace in the current project
+.SH SYNOPSIS
+\fBskillastic init\fR [\fB\-\-app\-name\fR] [\fB\-\-template\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Initialize a .skillastic workspace in the current project
+.SH OPTIONS
+.TP
+\fB\-\-app\-name\fR \fI<APP_NAME>\fR
+Application name (defaults to the directory name)
+.TP
+\fB\-\-template\fR \fI<TEMPLATE>\fR
+Project\-type template to seed (rust, node, python, go)
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help

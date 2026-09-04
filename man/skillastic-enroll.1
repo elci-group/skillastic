@@ -1,0 +1,31 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic enroll" 1  "skillastic enroll " 
+.SH NAME
+skillastic enroll \- First\-time setup: discover local repos, install the daemon, and make sure it survives logout/reboot
+.SH SYNOPSIS
+\fBskillastic enroll\fR [\fB\-\-system\fR] [\fB\-\-root\fR] [\fB\-\-interval\fR] [\fB\-\-init\-missing\fR] [\fB\-\-max\-depth\fR] [\fB\-\-dry\-run\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+First\-time setup: discover local repos, install the daemon, and make sure it survives logout/reboot
+.SH OPTIONS
+.TP
+\fB\-\-system\fR
+Monitor every user\*(Aqs repos and autostart at boot instead of login. Requires root
+.TP
+\fB\-\-root\fR \fI<ROOTS>\fR
+Directory to scan for repos (repeatable). Defaults to $HOME for user scope, or /home for system scope
+.TP
+\fB\-\-interval\fR \fI<INTERVAL>\fR [default: 300]
+Poll interval for each enrolled daemon, in seconds
+.TP
+\fB\-\-init\-missing\fR
+Also run `skillastic init` for discovered git repos that have no .skillastic workspace yet, so they can be enrolled too
+.TP
+\fB\-\-max\-depth\fR \fI<MAX_DEPTH>\fR [default: 6]
+Max directory depth to scan below each root
+.TP
+\fB\-\-dry\-run\fR
+Report what would happen without installing or starting anything
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
