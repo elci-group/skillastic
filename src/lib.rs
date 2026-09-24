@@ -27,6 +27,7 @@ pub mod registry;
 pub mod resolver;
 pub mod search;
 pub mod setup;
+pub mod skill_file;
 pub mod templates;
 
 pub use error::{Result, SkillasticError};

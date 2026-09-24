@@ -56,6 +56,7 @@ fn help_exposes_the_core_workflow() {
         "history",
         "promoted",
         "lint",
+        "validate-skills",
         "doctor",
         "domain-model",
         "adr",
@@ -67,6 +68,35 @@ fn help_exposes_the_core_workflow() {
     ] {
         assert!(stdout.contains(command), "help omitted {command}");
     }
+}
+
+#[test]
+fn validate_skills_reports_loader_errors_and_exits_nonzero() {
+    let dir = TempDir::new().unwrap();
+    let skills = dir.path().join("skills");
+    fs::create_dir_all(skills.join("good")).unwrap();
+    fs::create_dir_all(skills.join("broken")).unwrap();
+    fs::write(
+        skills.join("good/SKILL.md"),
+        "---\nname: good\ndescription: Works\n---\n\n# Good\n",
+    )
+    .unwrap();
+    fs::write(skills.join("broken/SKILL.md"), "# Broken\n").unwrap();
+
+    let output = skillastic(
+        &dir,
+        &["--json", "validate-skills", skills.to_str().unwrap()],
+    );
+    assert!(!output.status.success());
+    let report: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(report["checked"], 2);
+    assert_eq!(report["findings"][0]["category"], "shape");
+    assert!(
+        report["findings"][0]["message"]
+            .as_str()
+            .unwrap()
+            .contains("frontmatter")
+    );
 }
 
 /// `enroll --dry-run` must never touch the real machine (no systemd units,

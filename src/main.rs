@@ -20,6 +20,7 @@ use skillastic::registry::Registry;
 use skillastic::resolver::{Resolver, parse_req};
 use skillastic::search;
 use skillastic::setup;
+use skillastic::skill_file;
 use skillastic::templates;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -209,6 +210,13 @@ pub enum Command {
         /// Also run domain-language checks against CONTEXT.md.
         #[arg(long)]
         domain: bool,
+    },
+
+    /// Validate loader-facing SKILL.md files in skill folders or collections.
+    ValidateSkills {
+        /// SKILL.md files, skill folders, or directories of skill folders.
+        #[arg(required = true)]
+        paths: Vec<PathBuf>,
     },
 
     /// Check workspace health and report actionable fixes.
@@ -896,6 +904,30 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
                 for v in &report.violations {
                     println!("  - {v}");
                 }
+            }
+        }
+
+        Command::ValidateSkills { paths } => {
+            let report = skill_file::validate_paths(&paths)?;
+            if json {
+                print_json(&report);
+            } else if report.findings.is_empty() {
+                println!("Validated {} skill file(s).", report.checked);
+            } else {
+                for finding in &report.findings {
+                    println!(
+                        "{} [{}]: {}",
+                        finding.path.display(),
+                        finding.category,
+                        finding.message
+                    );
+                }
+            }
+            if !report.findings.is_empty() {
+                return Err(SkillasticError::Other(format!(
+                    "{} skill validation finding(s)",
+                    report.findings.len()
+                )));
             }
         }
 

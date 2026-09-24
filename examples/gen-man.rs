@@ -13,6 +13,7 @@ use std::path::Path;
 
 // The CLI types live in the binary crate; include it as a module so the
 // derive output comes straight from the real definitions.
+#[allow(dead_code)]
 #[path = "../src/main.rs"]
 mod defs;
 

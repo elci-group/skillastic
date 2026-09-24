@@ -60,6 +60,7 @@ skillastic capture --json
 - **Not sure which command fits?** `skillastic show --docs ask-skillastic`
 - **Many projects to audit?** `skillastic audit --root /home/sal --json`
 - **Working on domain language?** `skillastic domain-model`
+- **Checking installed skill files?** `skillastic validate-skills ~/.agents/skills ~/.codex/skills`
 - **Recording a decision?** `skillastic adr add "Use immutable snapshots"`
 - **Need a workflow skill?** `skillastic add tdd --template tdd --bucket engineering --invocation model`
 
@@ -118,6 +119,12 @@ skillastic history frontend
 ```
 
 Skill names are restricted to ASCII letters, digits, `.`, `_`, and `-`. Migration never mutates an old snapshot. Optional LLM-assisted rewrites are disabled by default and require an explicit `llm_command` in `.skillastic/config.json`.
+
+### Validate loader-facing skills
+
+`skillastic validate-skills` accepts a `SKILL.md` file, a skill folder, or a directory whose immediate child folders are skills. It needs no initialized Skillastic workspace. It exits nonzero on findings; add `--json` for a report with `checked` and categorized `findings`.
+
+The validator checks that each skill has a `SKILL.md` with YAML frontmatter, a nonempty instruction body, a valid folder-matching `name`, and a nonempty string `description`. It parses YAML rather than guessing from text, and checks the types of supported optional fields (`license`, `compatibility`, `allowed-tools`, and `metadata`). This catches missing frontmatter and indentation errors that prevent skill discovery. The `.skillastic` registry's `body.md` files remain plain Markdown and use `skillastic lint` for registry checks.
 
 ## Development
 
