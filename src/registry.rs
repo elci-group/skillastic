@@ -6,6 +6,9 @@
 //!   config.json                 workspace config
 //!   state.json                  daemon state
 //!   promoted.json               curated promoted skill names
+//!   review.json                 latest skill-use review report
+//!   suggestions.json            latest refinement suggestions per skill
+//!   usage.jsonl                 append-only skill-use event log
 //!   skills/<bucket>/<name>/     meta.json + body.md (new layout)
 //!   skills/<name>.json          legacy skill object
 //!   skills/<name>.md            legacy instruction body
@@ -14,7 +17,8 @@
 
 use crate::error::{Result, SkillasticError};
 use crate::model::{
-    Config, DaemonState, Decision, Resolution, Skill, SkillInvocation, SkillStatus,
+    Config, DaemonState, Decision, Resolution, ReviewReport, Skill, SkillInvocation, SkillStatus,
+    SuggestionStore,
 };
 use crate::templates;
 use semver::Version;
@@ -28,6 +32,8 @@ const SNAPSHOTS: &str = "snapshots";
 const CONFIG: &str = "config.json";
 const STATE: &str = "state.json";
 const PROMOTED: &str = "promoted.json";
+const REVIEW: &str = "review.json";
+const SUGGESTIONS: &str = "suggestions.json";
 pub const BUCKETS: &[&str] = &[
     "core",
     "engineering",
@@ -140,6 +146,40 @@ impl Registry {
         )
     }
 
+    // ---- review & suggestions ---------------------------------------------
+
+    pub fn review(&self) -> Result<ReviewReport> {
+        let path = self.root.join(REVIEW);
+        if !path.exists() {
+            return Ok(ReviewReport::default());
+        }
+        let raw = fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&raw)?)
+    }
+
+    pub fn save_review(&self, report: &ReviewReport) -> Result<()> {
+        write_atomic(
+            &self.root.join(REVIEW),
+            &serde_json::to_string_pretty(report)?,
+        )
+    }
+
+    pub fn suggestions(&self) -> Result<SuggestionStore> {
+        let path = self.root.join(SUGGESTIONS);
+        if !path.exists() {
+            return Ok(SuggestionStore::default());
+        }
+        let raw = fs::read_to_string(path)?;
+        Ok(serde_json::from_str(&raw)?)
+    }
+
+    pub fn save_suggestions(&self, store: &SuggestionStore) -> Result<()> {
+        write_atomic(
+            &self.root.join(SUGGESTIONS),
+            &serde_json::to_string_pretty(store)?,
+        )
+    }
+
     fn seed_ask_skillastic(&self) -> Result<()> {
         let mut skill = Skill::new(
             "ask-skillastic",
@@ -214,6 +254,11 @@ impl Registry {
             skill.body_path = format!("{name}.md");
         }
         Ok(skill)
+    }
+
+    /// True when a skill with this name is registered.
+    pub fn has_skill(&self, name: &str) -> bool {
+        self.find_skill_path(name).is_some()
     }
 
     /// All registered skills, sorted by name.

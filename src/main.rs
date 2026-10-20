@@ -13,15 +13,18 @@ use skillastic::enroll;
 use skillastic::error::Result;
 use skillastic::lint;
 use skillastic::migrate::{Migrator, verify};
-use skillastic::model::{Config, Decision, Skill, SkillInvocation};
+use skillastic::model::{Config, Decision, ReviewStatus, Skill, SkillInvocation, UsageKind};
 use skillastic::monitor::{self, MonitorRegistry, Scope};
 use skillastic::register;
 use skillastic::registry::Registry;
 use skillastic::resolver::{Resolver, parse_req};
+use skillastic::review;
 use skillastic::search;
 use skillastic::setup;
 use skillastic::skill_file;
+use skillastic::suggest;
 use skillastic::templates;
+use skillastic::usage;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -58,6 +61,23 @@ impl From<InvocationArg> for SkillInvocation {
             InvocationArg::User => SkillInvocation::UserInvoked,
             InvocationArg::Model => SkillInvocation::ModelInvoked,
             InvocationArg::Both => SkillInvocation::Both,
+        }
+    }
+}
+
+#[derive(Clone, ValueEnum)]
+pub enum UsageKindArg {
+    Invoked,
+    Completed,
+    Failed,
+}
+
+impl From<UsageKindArg> for UsageKind {
+    fn from(arg: UsageKindArg) -> Self {
+        match arg {
+            UsageKindArg::Invoked => UsageKind::Invoked,
+            UsageKindArg::Completed => UsageKind::Completed,
+            UsageKindArg::Failed => UsageKind::Failed,
         }
     }
 }
@@ -185,6 +205,24 @@ pub enum Command {
 
     /// Show recent daemon events recorded in the workspace state.
     Events,
+
+    /// Record or inspect skill-use events.
+    Usage {
+        #[command(subcommand)]
+        action: UsageAction,
+    },
+
+    /// Review recorded skill usage and flag skills that need attention.
+    Review,
+
+    /// Ask an inference backend for skill refinement suggestions.
+    Suggest {
+        /// Suggest for one skill (default: every skill the review flags).
+        skill: Option<String>,
+        /// Model override for the inference backend.
+        #[arg(long)]
+        model: Option<String>,
+    },
 
     /// Audit project roots for missing or incomplete .skillastic workspaces.
     Audit {
@@ -325,6 +363,28 @@ pub enum MonitorAction {
     Disable { path: Option<PathBuf> },
     /// Start daemons for all enabled, not-running projects.
     Resume,
+}
+
+#[derive(Subcommand)]
+pub enum UsageAction {
+    /// Record one skill-use event (for agent hooks and scripts).
+    Record {
+        /// Skill name.
+        #[arg(long)]
+        skill: String,
+        /// Kind of event to record.
+        #[arg(long, value_enum)]
+        event: UsageKindArg,
+        /// Optional free-form note.
+        #[arg(long)]
+        note: Option<String>,
+    },
+    /// Show aggregated usage per skill.
+    Show {
+        /// Limit output to one skill.
+        #[arg(long)]
+        skill: Option<String>,
+    },
 }
 
 #[derive(Subcommand)]
@@ -812,6 +872,182 @@ fn run(cli: Cli, project_root: &Path) -> Result<()> {
             } else {
                 for event in &events {
                     println!("{event}");
+                }
+            }
+        }
+
+        Command::Usage { action } => {
+            let registry = open_registry(project_root)?;
+            match action {
+                UsageAction::Record { skill, event, note } => {
+                    let entry = usage::record(&registry, &skill, event.into(), note)?;
+                    if json {
+                        print_json(&entry);
+                    } else {
+                        println!("recorded {} for {}", entry.event, entry.skill);
+                    }
+                }
+                UsageAction::Show { skill } => {
+                    let log = usage::load(&registry)?;
+                    let stats = usage::aggregate(&log.events);
+                    if json {
+                        print_json(&stats);
+                    } else if stats.is_empty() {
+                        println!("No usage events recorded yet.");
+                    } else {
+                        let rows: Vec<Vec<String>> = stats
+                            .iter()
+                            .filter(|(name, _)| skill.as_deref().is_none_or(|s| s == name.as_str()))
+                            .map(|(name, s)| {
+                                vec![
+                                    name.clone(),
+                                    s.invoked.to_string(),
+                                    s.completed.to_string(),
+                                    s.failed.to_string(),
+                                    format!("{:.0}%", s.failure_rate() * 100.0),
+                                    s.last_seen
+                                        .map(|t| t.format("%Y-%m-%d %H:%M").to_string())
+                                        .unwrap_or_else(|| "-".into()),
+                                ]
+                            })
+                            .collect();
+                        if rows.is_empty() {
+                            println!("No usage events recorded for that skill.");
+                        } else {
+                            print!(
+                                "{}",
+                                table(
+                                    &[
+                                        "SKILL",
+                                        "INVOKED",
+                                        "COMPLETED",
+                                        "FAILED",
+                                        "FAIL%",
+                                        "LAST SEEN"
+                                    ],
+                                    rows
+                                )
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        Command::Review => {
+            let registry = open_registry(project_root)?;
+            let config = registry.config()?;
+            let app_version = appver::detect(project_root, &config, app_version_override)?;
+            let report = review::run(&registry, &app_version)?;
+            registry.save_review(&report)?;
+            if json {
+                print_json(&report);
+            } else {
+                println!(
+                    "Reviewed {} skill(s) against app {app_version}.",
+                    report.skills.len()
+                );
+                let attention: Vec<_> = report
+                    .skills
+                    .iter()
+                    .filter(|s| s.status == ReviewStatus::Attention)
+                    .collect();
+                if attention.is_empty() {
+                    println!("No skills need attention.");
+                } else {
+                    println!("{} skill(s) need attention:", attention.len());
+                    for skill_review in attention {
+                        for finding in &skill_review.findings {
+                            println!(
+                                "  {} [{}] {}",
+                                skill_review.skill, finding.severity, finding.message
+                            );
+                        }
+                    }
+                }
+                if report.orphan_events > 0 {
+                    println!(
+                        "{} event(s) reference skills that are no longer registered.",
+                        report.orphan_events
+                    );
+                }
+            }
+        }
+
+        Command::Suggest { skill, model } => {
+            let registry = open_registry(project_root)?;
+            let config = registry.config()?;
+            let app_version = appver::detect(project_root, &config, app_version_override)?;
+            // Suggestions are grounded in a fresh review.
+            let report = review::run(&registry, &app_version)?;
+            registry.save_review(&report)?;
+            let targets: Vec<Skill> = match &skill {
+                Some(name) => vec![registry.load_skill(name)?],
+                None => {
+                    let flagged: Vec<String> = report
+                        .skills
+                        .iter()
+                        .filter(|s| s.status == ReviewStatus::Attention)
+                        .map(|s| s.skill.clone())
+                        .collect();
+                    flagged
+                        .iter()
+                        .filter_map(|name| registry.load_skill(name).ok())
+                        .collect()
+                }
+            };
+            if targets.is_empty() {
+                if json {
+                    print_json(&skillastic::model::SuggestionStore::default());
+                } else {
+                    println!("No skills need attention; nothing to suggest.");
+                }
+            } else {
+                let backend = suggest::resolve_backend(&config);
+                let outcome = suggest::run(
+                    &registry,
+                    &app_version,
+                    &targets,
+                    &report,
+                    model.as_deref(),
+                    &backend,
+                )?;
+                if json {
+                    print_json(&outcome.store);
+                } else {
+                    let touched: std::collections::BTreeSet<&str> =
+                        targets.iter().map(|s| s.name.as_str()).collect();
+                    for entry in outcome
+                        .store
+                        .suggestions
+                        .iter()
+                        .filter(|e| touched.contains(e.skill.as_str()))
+                    {
+                        if entry.status == "complete" {
+                            println!("{} ({} via {}):", entry.skill, entry.model, entry.backend);
+                            if !entry.summary.is_empty() {
+                                println!("  summary: {}", entry.summary);
+                            }
+                            for item in &entry.items {
+                                println!(
+                                    "  - {} — {} Suggested edit: {}",
+                                    item.title, item.rationale, item.suggested_edit
+                                );
+                            }
+                        } else {
+                            println!(
+                                "{}: {}{}",
+                                entry.skill,
+                                entry.status,
+                                entry
+                                    .error
+                                    .as_ref()
+                                    .map(|e| format!(" ({e})"))
+                                    .unwrap_or_default()
+                            );
+                        }
+                    }
+                    println!("Advisory only — nothing was modified.");
                 }
             }
         }

@@ -1,0 +1,19 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic suggest" 1  "skillastic suggest " 
+.SH NAME
+skillastic suggest \- Ask an inference backend for skill refinement suggestions
+.SH SYNOPSIS
+\fBskillastic suggest\fR [\fB\-\-model\fR] [\fB\-h\fR|\fB\-\-help\fR] [\fISKILL\fR] 
+.SH DESCRIPTION
+Ask an inference backend for skill refinement suggestions
+.SH OPTIONS
+.TP
+\fB\-\-model\fR \fI<MODEL>\fR
+Model override for the inference backend
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help
+.TP
+[\fISKILL\fR]
+Suggest for one skill (default: every skill the review flags)

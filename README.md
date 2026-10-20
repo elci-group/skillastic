@@ -97,6 +97,17 @@ skillastic verify frontend
 skillastic history frontend
 ```
 
+## Skill-use review and refinement suggestions
+
+Skillastic can watch how skills are actually used and turn that signal into upkeep work:
+
+- Agents (or hooks, or scripts) record each use: `skillastic usage record --skill frontend --event invoked` (`invoked` | `completed` | `failed`, optional `--note`). Events append to `.skillastic/usage.jsonl`.
+- `skillastic review` aggregates the log and flags skills that need attention: never invoked, in use but verified against an older app version, or failing at least half of their recorded invocations. The report is written to `.skillastic/review.json`.
+- The daemon runs the same review whenever the app changes or new usage events arrive, and logs what it finds (`skillastic events`). Set `auto_suggest: true` in `.skillastic/config.json` to also refresh suggestions automatically (at most once per hour).
+- `skillastic suggest` asks an inference backend for concrete, advisory refinement suggestions for every flagged skill (or one named skill), grounded in the skill body, usage stats, and review findings. Results land in `.skillastic/suggestions.json` and are never applied to skill bodies automatically.
+
+Suggestions need an inference backend, and stay off unless configured: either an external `llm_command` in `.skillastic/config.json` (payload on stdin, JSON on stdout), or `GROQ_API_KEY` in the environment. Pick the model with `--model` or `suggest_model` in the config; the default is `llama-3.1-8b-instant`.
+
 ## Workspace layout
 
 ```text
@@ -104,6 +115,9 @@ skillastic history frontend
   config.json                         workspace config
   state.json                          daemon state
   promoted.json                       curated promoted skill names
+  review.json                         latest skill-use review report
+  suggestions.json                    latest refinement suggestions per skill
+  usage.jsonl                         append-only skill-use event log
   agents/
     issue-tracker.md                  issue tracker workflow
     triage-labels.md                  triage label vocabulary
@@ -118,7 +132,7 @@ skillastic history frontend
   adr/NNNN-title.md                   architectural decision records
 ```
 
-Skill names are restricted to ASCII letters, digits, `.`, `_`, and `-`. Migration never mutates an old snapshot. Optional LLM-assisted rewrites are disabled by default and require an explicit `llm_command` in `.skillastic/config.json`.
+Skill names are restricted to ASCII letters, digits, `.`, `_`, and `-`. Migration never mutates an old snapshot. Optional LLM-assisted rewrites and suggestions are disabled by default and require an explicit `llm_command` or `GROQ_API_KEY`.
 
 ### Validate loader-facing skills
 

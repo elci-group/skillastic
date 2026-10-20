@@ -263,6 +263,15 @@ pub struct Config {
     /// on stdout. Off (None) by default.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub llm_command: Option<String>,
+    /// Let the daemon run inference-powered refinement suggestions after a
+    /// review that flags skills. Off by default; `suggest` always works
+    /// when invoked explicitly.
+    #[serde(default)]
+    pub auto_suggest: bool,
+    /// Model override for suggestions (Groq model id, or ignored by an
+    /// external `llm_command` backend).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggest_model: Option<String>,
 }
 
 impl Default for Config {
@@ -272,6 +281,8 @@ impl Default for Config {
             app_version: None,
             auto_migrate: true,
             llm_command: None,
+            auto_suggest: false,
+            suggest_model: None,
         }
     }
 }
@@ -288,6 +299,16 @@ pub struct DaemonState {
     /// Recent daemon events (ring buffer, newest last).
     #[serde(default)]
     pub events: Vec<String>,
+    /// When the daemon last ran a skill-use review.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_review: Option<DateTime<Utc>>,
+    /// When the daemon last attempted inference suggestions.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_suggest: Option<DateTime<Utc>>,
+    /// Usage-log line count at the last review, so ticks only re-review
+    /// when new events arrived.
+    #[serde(default)]
+    pub usage_lines_reviewed: u64,
 }
 
 impl DaemonState {
@@ -299,6 +320,195 @@ impl DaemonState {
             let excess = self.events.len() - Self::MAX_EVENTS;
             self.events.drain(..excess);
         }
+    }
+}
+
+/// One recorded use of a skill, appended to `.skillastic/usage.jsonl`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsageEvent {
+    pub timestamp: DateTime<Utc>,
+    pub skill: String,
+    pub event: UsageKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub note: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UsageKind {
+    Invoked,
+    Completed,
+    Failed,
+}
+
+/// Aggregated use of one skill over every recorded event.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct UsageStats {
+    pub invoked: u64,
+    pub completed: u64,
+    pub failed: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub first_seen: Option<DateTime<Utc>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_seen: Option<DateTime<Utc>>,
+}
+
+impl UsageStats {
+    /// Failed uses per invoked use, 0.0 when never invoked.
+    pub fn failure_rate(&self) -> f64 {
+        if self.invoked == 0 {
+            0.0
+        } else {
+            self.failed as f64 / self.invoked as f64
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Severity {
+    Info,
+    Warning,
+    Critical,
+}
+
+/// A deterministic observation about one skill's usage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Finding {
+    pub kind: FindingKind,
+    pub severity: Severity,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FindingKind {
+    /// The skill has never been invoked.
+    NeverUsed,
+    /// The skill is in use but was verified against an older app version.
+    StaleVerification,
+    /// At least half the recorded invocations failed.
+    HighFailureRate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReviewStatus {
+    Ok,
+    Attention,
+}
+
+impl fmt::Display for ReviewStatus {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Ok => "ok",
+            Self::Attention => "attention",
+        };
+        f.write_str(s)
+    }
+}
+
+impl fmt::Display for UsageKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Invoked => "invoked",
+            Self::Completed => "completed",
+            Self::Failed => "failed",
+        };
+        f.write_str(s)
+    }
+}
+
+impl fmt::Display for Severity {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let s = match self {
+            Self::Info => "info",
+            Self::Warning => "warning",
+            Self::Critical => "critical",
+        };
+        f.write_str(s)
+    }
+}
+
+/// Review outcome for a single skill.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillReview {
+    pub skill: String,
+    pub status: ReviewStatus,
+    pub stats: UsageStats,
+    #[serde(default)]
+    pub findings: Vec<Finding>,
+}
+
+/// `.skillastic/review.json` — outcome of the latest skill-use review.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewReport {
+    pub generated_at: DateTime<Utc>,
+    pub app_version: Version,
+    #[serde(default)]
+    pub skills: Vec<SkillReview>,
+    /// Events referencing skills that are no longer registered.
+    #[serde(default)]
+    pub orphan_events: u64,
+}
+
+impl Default for ReviewReport {
+    fn default() -> Self {
+        Self {
+            generated_at: DateTime::<Utc>::from(std::time::UNIX_EPOCH),
+            app_version: Version::new(0, 0, 0),
+            skills: Vec::new(),
+            orphan_events: 0,
+        }
+    }
+}
+
+impl ReviewReport {
+    pub fn attention_count(&self) -> usize {
+        self.skills
+            .iter()
+            .filter(|s| s.status == ReviewStatus::Attention)
+            .count()
+    }
+}
+
+/// One proposed refinement for a skill, produced by inference.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SuggestionItem {
+    pub title: String,
+    pub rationale: String,
+    /// Advisory edit guidance; never applied to the body automatically.
+    pub suggested_edit: String,
+}
+
+/// Suggestions for one skill from one inference run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SkillSuggestions {
+    pub skill: String,
+    pub generated_at: DateTime<Utc>,
+    pub backend: String,
+    pub model: String,
+    pub status: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub items: Vec<SuggestionItem>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// `.skillastic/suggestions.json` — latest suggestions per skill.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct SuggestionStore {
+    #[serde(default)]
+    pub suggestions: Vec<SkillSuggestions>,
+}
+
+impl SuggestionStore {
+    /// Replace the entry for `entry.skill`, or prepend it as the newest.
+    pub fn upsert(&mut self, entry: SkillSuggestions) {
+        self.suggestions.retain(|s| s.skill != entry.skill);
+        self.suggestions.insert(0, entry);
     }
 }
 

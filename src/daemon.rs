@@ -1,16 +1,24 @@
 //! Skillastic daemon: polls the application for version/HEAD changes and
-//! re-resolves all skills, auto-migrating when configured.
+//! re-resolves all skills, auto-migrating when configured. Also reviews
+//! skill-use events each tick and, when opted in, refreshes inference
+//! refinement suggestions for flagged skills.
 
 use crate::appver;
 use crate::archaeology::Archaeology;
 use crate::error::Result;
 use crate::git::Git;
 use crate::migrate::Migrator;
-use crate::model::Decision;
+use crate::model::{Decision, ReviewStatus};
 use crate::registry::Registry;
 use crate::resolver::Resolver;
+use crate::review;
+use crate::suggest::{self, Backend};
+use crate::usage;
 use chrono::Utc;
 use std::time::Duration;
+
+/// Minimum seconds between daemon-driven suggestion runs.
+const SUGGEST_COOLDOWN_SECS: i64 = 3600;
 
 pub struct Daemon<'a> {
     registry: &'a Registry,
@@ -93,8 +101,70 @@ impl<'a> Daemon<'a> {
                 }
             }
 
-            state.last_app_version = Some(app_version);
+            state.last_app_version = Some(app_version.clone());
             state.last_head = head;
+        }
+
+        // Phase 2: skill-use review, then optional inference suggestions.
+        // Errors are caught into events (like migration failures) so the
+        // loop never dies on a bad review or backend.
+        let usage_log = usage::load(self.registry)?;
+        if review::review_due(&state, &usage_log, version_changed, head_changed) {
+            match review::run(self.registry, &app_version) {
+                Ok(report) => match self.registry.save_review(&report) {
+                    Ok(()) => {
+                        state.last_review = Some(Utc::now());
+                        state.usage_lines_reviewed = usage_log.lines;
+                        let flagged: Vec<String> = report
+                            .skills
+                            .iter()
+                            .filter(|s| s.status == ReviewStatus::Attention)
+                            .map(|s| s.skill.clone())
+                            .collect();
+                        if !flagged.is_empty() {
+                            events.push(format!(
+                                "review: {} skill(s) need attention ({})",
+                                flagged.len(),
+                                flagged.join(", ")
+                            ));
+                            if config.auto_suggest && suggest_cooled_down(&state) {
+                                let backend = suggest::resolve_backend(&config);
+                                let targets: Vec<crate::model::Skill> = flagged
+                                    .iter()
+                                    .filter_map(|name| self.registry.load_skill(name).ok())
+                                    .collect();
+                                match suggest::run(
+                                    self.registry,
+                                    &app_version,
+                                    &targets,
+                                    &report,
+                                    None,
+                                    &backend,
+                                ) {
+                                    Ok(outcome) => {
+                                        state.last_suggest = Some(Utc::now());
+                                        match backend {
+                                            Backend::None => events.push(
+                                                "suggestions skipped: no backend configured".into(),
+                                            ),
+                                            _ => events.push(format!(
+                                                "suggestions refreshed for {} skill(s) via {}",
+                                                outcome.attempted,
+                                                backend_name(&backend)
+                                            )),
+                                        }
+                                    }
+                                    Err(e) => {
+                                        events.push(format!("suggestions failed: {e}"));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => events.push(format!("review failed: {e}")),
+                },
+                Err(e) => events.push(format!("review failed: {e}")),
+            }
         }
 
         state.last_check = Some(Utc::now());
@@ -109,6 +179,21 @@ impl<'a> Daemon<'a> {
     }
 }
 
+fn suggest_cooled_down(state: &crate::model::DaemonState) -> bool {
+    state
+        .last_suggest
+        .map(|last| (Utc::now() - last).num_seconds() >= SUGGEST_COOLDOWN_SECS)
+        .unwrap_or(true)
+}
+
+fn backend_name(backend: &Backend) -> &'static str {
+    match backend {
+        Backend::None => "none",
+        Backend::LlmCommand(_) => "llm_command",
+        Backend::Groq => "groq",
+    }
+}
+
 /// Recent daemon events from `state.json`, for inspection.
 pub fn recent_events(registry: &Registry) -> Result<Vec<String>> {
     Ok(registry.state()?.events)
@@ -117,7 +202,7 @@ pub fn recent_events(registry: &Registry) -> Result<Vec<String>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{Config, Skill, SkillStatus};
+    use crate::model::{Config, Skill, SkillStatus, UsageKind};
     use semver::Version;
     use std::fs;
     use tempfile::TempDir;
@@ -233,5 +318,82 @@ mod tests {
         let (_dir, registry) = setup("1.0.0");
         let events = Daemon::new(&registry, 1).tick().unwrap();
         assert_eq!(recent_events(&registry).unwrap().len(), events.len());
+    }
+
+    #[test]
+    fn tick_reviews_usage_and_persists_report() {
+        let (_dir, registry) = setup("1.0.0");
+        add_skill(&registry, ">=1.0.0, <2.0.0", "1.0.0");
+        usage::record(&registry, "web", UsageKind::Invoked, None).unwrap();
+
+        let events = Daemon::new(&registry, 1).tick().unwrap();
+        // The skill is in use and verified: no attention event.
+        assert!(!events.iter().any(|e| e.starts_with("review:")));
+
+        let state = registry.state().unwrap();
+        assert_eq!(state.usage_lines_reviewed, 1);
+        assert!(state.last_review.is_some());
+        let report = registry.review().unwrap();
+        // web plus the seeded ask-skillastic.
+        assert_eq!(report.skills.len(), 2);
+        assert_eq!(report.skills[0].skill, "ask-skillastic");
+
+        // New tick, no new events, no changes: quiet, no re-review.
+        assert!(Daemon::new(&registry, 1).tick().unwrap().is_empty());
+    }
+
+    #[test]
+    fn flagged_skill_logs_event_without_auto_suggest() {
+        let (_dir, registry) = setup("1.0.0");
+        add_skill(&registry, ">=1.0.0, <2.0.0", "1.0.0");
+        for _ in 0..3 {
+            usage::record(&registry, "web", UsageKind::Invoked, None).unwrap();
+        }
+        for _ in 0..2 {
+            usage::record(&registry, "web", UsageKind::Failed, None).unwrap();
+        }
+
+        let events = Daemon::new(&registry, 1).tick().unwrap();
+        assert!(
+            events
+                .iter()
+                .any(|e| e.contains("review: 1 skill(s) need attention"))
+        );
+        // auto_suggest is off by default: no suggestion attempt.
+        assert!(!registry.root().join("suggestions.json").exists());
+        assert!(registry.state().unwrap().last_suggest.is_none());
+    }
+
+    #[test]
+    fn auto_suggest_refreshes_via_configured_command() {
+        let (_dir, registry) = setup("1.0.0");
+        add_skill(&registry, ">=1.0.0, <2.0.0", "1.0.0");
+        for _ in 0..3 {
+            usage::record(&registry, "web", UsageKind::Invoked, None).unwrap();
+        }
+        for _ in 0..3 {
+            usage::record(&registry, "web", UsageKind::Failed, None).unwrap();
+        }
+        let mut config = registry.config().unwrap();
+        config.auto_suggest = true;
+        config.llm_command = Some("printf '{\"summary\":\"tighten\",\"items\":[]}'".into());
+        registry.save_config(&config).unwrap();
+
+        let events = Daemon::new(&registry, 1).tick().unwrap();
+        assert!(
+            events
+                .iter()
+                .any(|e| e.contains("suggestions refreshed for 1 skill(s) via llm_command"))
+        );
+        assert!(registry.state().unwrap().last_suggest.is_some());
+        let entry = registry
+            .suggestions()
+            .unwrap()
+            .suggestions
+            .into_iter()
+            .find(|s| s.skill == "web")
+            .unwrap();
+        assert_eq!(entry.status, "complete");
+        assert_eq!(entry.summary, "tighten");
     }
 }

@@ -1,0 +1,34 @@
+.ie \n(.g .ds Aq \(aq
+.el .ds Aq '
+.TH "skillastic usage record" 1  "skillastic usage record " 
+.SH NAME
+skillastic usage record \- Record one skill\-use event (for agent hooks and scripts)
+.SH SYNOPSIS
+\fBskillastic usage record\fR <\fB\-\-skill\fR> <\fB\-\-event\fR> [\fB\-\-note\fR] [\fB\-h\fR|\fB\-\-help\fR] 
+.SH DESCRIPTION
+Record one skill\-use event (for agent hooks and scripts)
+.SH OPTIONS
+.TP
+\fB\-\-skill\fR \fI<SKILL>\fR
+Skill name
+.TP
+\fB\-\-event\fR \fI<EVENT>\fR
+Kind of event to record
+.br
+
+.br
+\fIPossible values:\fR
+.RS 14
+.IP \(bu 2
+invoked
+.IP \(bu 2
+completed
+.IP \(bu 2
+failed
+.RE
+.TP
+\fB\-\-note\fR \fI<NOTE>\fR
+Optional free\-form note
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Print help

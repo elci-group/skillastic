@@ -25,10 +25,13 @@ pub mod monitor;
 pub mod register;
 pub mod registry;
 pub mod resolver;
+pub mod review;
 pub mod search;
 pub mod setup;
 pub mod skill_file;
+pub mod suggest;
 pub mod templates;
+pub mod usage;
 
 pub use error::{Result, SkillasticError};
 pub use model::SkillInvocation;

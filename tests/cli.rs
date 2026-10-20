@@ -65,6 +65,9 @@ fn help_exposes_the_core_workflow() {
         "enroll",
         "monitor",
         "register",
+        "usage",
+        "review",
+        "suggest",
     ] {
         assert!(stdout.contains(command), "help omitted {command}");
     }
@@ -540,4 +543,167 @@ fn promoted_command_validates_seeded_skill() {
             .contains(&"ask-skillastic".into())
     );
     assert!(promoted["missing"].as_array().unwrap().is_empty());
+}
+
+/// `suggest` with no `llm_command` configured and no `GROQ_API_KEY` must not
+/// fail — it stores a `skipped_no_backend` entry per target skill.
+fn suggest_without_backend_reports_skipped(dir: &TempDir) {
+    let output = Command::new(env!("CARGO_BIN_EXE_skillastic"))
+        .args(["suggest", "--json"])
+        .current_dir(dir.path())
+        .env_remove("GROQ_API_KEY")
+        .output()
+        .expect("skillastic binary should run");
+    assert!(
+        output.status.success(),
+        "suggest failed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let store: Value = serde_json::from_slice(&output.stdout).unwrap();
+    let entry = store["suggestions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|s| s["skill"] == "web")
+        .expect("web should have a suggestion entry");
+    assert_eq!(entry["status"], "skipped_no_backend");
+}
+
+fn init_with_web_skill(dir: &TempDir) {
+    success_json(dir, &["init", "--app-version", "1.0.0", "--json"]);
+    success_json(
+        dir,
+        &[
+            "add",
+            "web",
+            "--version",
+            "1.0.0",
+            "--compatible",
+            ">=1.0.0, <2.0.0",
+            "--verify",
+            "--app-version",
+            "1.0.0",
+            "--json",
+        ],
+    );
+}
+
+fn record_events(dir: &TempDir, events: &[(&str, &str)]) {
+    for (skill, event) in events {
+        success_json(
+            dir,
+            &[
+                "usage", "record", "--skill", skill, "--event", event, "--json",
+            ],
+        );
+    }
+}
+
+#[test]
+fn usage_record_and_show_round_trip() {
+    let dir = TempDir::new().unwrap();
+    init_with_web_skill(&dir);
+    record_events(
+        &dir,
+        &[
+            ("web", "invoked"),
+            ("web", "completed"),
+            ("web", "invoked"),
+            ("web", "failed"),
+        ],
+    );
+
+    let shown = success_json(&dir, &["usage", "show", "--json"]);
+    assert_eq!(shown["web"]["invoked"], 2);
+    assert_eq!(shown["web"]["completed"], 1);
+    assert_eq!(shown["web"]["failed"], 1);
+    assert!(shown["web"]["last_seen"].is_string());
+
+    // Filtering to one skill leaves the other (seeded) skill out.
+    let filtered = success_json(&dir, &["usage", "show", "--skill", "web", "--json"]);
+    assert_eq!(filtered.as_object().unwrap().len(), 1);
+}
+
+#[test]
+fn usage_record_rejects_unknown_skill() {
+    let dir = TempDir::new().unwrap();
+    init_with_web_skill(&dir);
+
+    let output = skillastic(
+        &dir,
+        &["usage", "record", "--skill", "nope", "--event", "invoked"],
+    );
+    assert!(!output.status.success());
+    let stderr = String::from_utf8(output.stderr).unwrap();
+    assert!(stderr.contains("skill not found: nope"));
+    assert!(!dir.path().join(".skillastic/usage.jsonl").exists());
+}
+
+#[test]
+fn review_flags_high_failure_rate_and_persists_report() {
+    let dir = TempDir::new().unwrap();
+    init_with_web_skill(&dir);
+    record_events(
+        &dir,
+        &[
+            ("web", "invoked"),
+            ("web", "invoked"),
+            ("web", "invoked"),
+            ("web", "failed"),
+            ("web", "failed"),
+            ("web", "failed"),
+        ],
+    );
+
+    let report = success_json(&dir, &["review", "--json"]);
+    assert_eq!(report["app_version"], "1.0.0");
+    let skills = report["skills"].as_array().unwrap();
+    let web = skills
+        .iter()
+        .find(|s| s["skill"] == "web")
+        .expect("web should be reviewed");
+    assert_eq!(web["status"], "attention");
+    assert!(
+        web["findings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|f| f["kind"] == "high_failure_rate")
+    );
+    // The seeded skill is never used but only carries an info finding.
+    let seeded = skills
+        .iter()
+        .find(|s| s["skill"] == "ask-skillastic")
+        .unwrap();
+    assert_eq!(seeded["status"], "ok");
+
+    // The report is persisted for the daemon and `suggest`.
+    assert!(dir.path().join(".skillastic/review.json").is_file());
+}
+
+#[test]
+fn suggest_runs_review_and_reports_without_backend() {
+    let dir = TempDir::new().unwrap();
+    init_with_web_skill(&dir);
+    record_events(
+        &dir,
+        &[
+            ("web", "invoked"),
+            ("web", "invoked"),
+            ("web", "invoked"),
+            ("web", "failed"),
+            ("web", "failed"),
+        ],
+    );
+    suggest_without_backend_reports_skipped(&dir);
+    // Human-readable output is advisory.
+    let output = Command::new(env!("CARGO_BIN_EXE_skillastic"))
+        .args(["suggest"])
+        .current_dir(dir.path())
+        .env_remove("GROQ_API_KEY")
+        .output()
+        .unwrap();
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    assert!(stdout.contains("skipped_no_backend"));
+    assert!(stdout.contains("Advisory only"));
 }
