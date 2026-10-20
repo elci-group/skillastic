@@ -1,3 +1,0 @@
-{"schema_version":1,"event":"azusa.drift.detected","timestamp":"2026-10-20T19:46:07Z","repository":"skillastic","state_a":"worktree","state_b":"remote","severity":"medium","score":3.13,"evidence":8,"tool_version":"0.1.39","analysis_mode":"deterministic"}
-{"schema_version":1,"event":"azusa.drift.detected","timestamp":"2026-10-20T19:46:32Z","repository":"skillastic","state_a":"worktree","state_b":"remote","severity":"medium","score":3.15,"evidence":8,"tool_version":"0.1.39","analysis_mode":"deterministic"}
-{"schema_version":1,"event":"azusa.drift.detected","timestamp":"2026-10-20T21:11:02Z","repository":"skillastic","state_a":"worktree","state_b":"remote","severity":"medium","score":3.15,"evidence":8,"tool_version":"0.1.39","analysis_mode":"deterministic"}

@@ -9,3 +9,6 @@ bench/results/*
 # kaptaind / build
  /.kaptaind/
  /target/
+.azusa/
+.lwoodz/
+.uni/
